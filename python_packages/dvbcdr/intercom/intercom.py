@@ -1,8 +1,8 @@
 import threading
 from typing import Callable, List, Union, Any
-from .crc import *
-from .callback import *
-from .message import *
+from .crc import crc24
+from .callback import Callback
+from .message import Message
 
 from threading import Thread
 from queue import Queue
