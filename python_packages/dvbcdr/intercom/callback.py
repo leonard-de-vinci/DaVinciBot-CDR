@@ -1,29 +1,26 @@
 import random
-from typing import Any, Callable, List, Union
+from typing import Any, Callable, List
 
 class Callback:
-    action = None
-    topics = None
+    action: Callable[[Any], None] = None
+    topic_codes: List[int] = None
 
-    ref = random.getrandbits(4)
+    ref = random.getrandbits(32)
 
-    def __init__(self, topics: Union[str, List[str], None], action: Callable[[str, Any], None]):
+    def __init__(self, topic_codes: List[int], action: Callable[[Any], None]):
         if not callable(action):
             raise TypeError("action is not callable")
 
-        if isinstance(topics, str):
-            topics = [topics]
-        elif not isinstance(topics, list) and topics is not None:
-            raise TypeError("topics is not a string, a list of strings or None")
+        if not isinstance(topic_codes, list):
+            raise TypeError("topic_codes is not a list")
 
-        if topics is not None:
-            topics = [x for x in topics if isinstance(x, str)]
-            if len(topics) == 0:
-                raise ValueError("topics doesn't contain any string")
+        topic_codes = [x for x in topic_codes if isinstance(x, int) and x < (1 << 23)]
+        if len(topic_codes) == 0:
+            raise ValueError("topic_codes doesn't contain any 24-bit integer")
 
-        self.topics = topics
+        self.topic_codes = topic_codes
         self.action = action
 
-    def run(self, topic: str, message_data):
+    def run(self, message_data):
         if self.action is not None:
-           self.action(topic=topic, message_data=message_data)
+           self.action(message_data)
