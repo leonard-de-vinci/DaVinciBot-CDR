@@ -1,4 +1,4 @@
-from typing import Tuple, Union
+from typing import Union
 
 CRC_POLY = 0x864cfb
 CRC_INIT = 0xb704ce

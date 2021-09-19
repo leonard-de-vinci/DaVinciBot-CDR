@@ -38,7 +38,6 @@ class Intercom:
     def __intercom_thread(self):
         """Internal method used to setup the socket and receive messages.
         \nThis method MUST NOT be run on the main thread as it is blocking the execution."""
-
         sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM, socket.IPPROTO_UDP)
         sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
         sock.setsockopt(socket.IPPROTO_IP, socket.IP_MULTICAST_TTL, MULTICAST_TTL)
@@ -65,7 +64,7 @@ class Intercom:
 
             except BlockingIOError:
                 pass # nothing to receive
-            except:
+            except Exception:
                 print("Intercom thread error", sys.exc_info()[0])
 
     def start(self):
@@ -107,7 +106,7 @@ class Intercom:
             if autosubscribe:
                 self.subscribe(topic, lambda *args: None)
             else:
-                raise ValueError("topic is not currently subscribe and autosubscribe is not True") 
+                raise ValueError("topic is not currently subscribed and autosubscribe is not True")
 
         topic_code = self.__get_topic_info(topic)[0]
 
@@ -137,7 +136,6 @@ class Intercom:
     def run_callbacks(self, process_limit=0):
         """Run on any thread the callbacks for the messages received on the intercom thread.
         \n`process_limit` limits the numbers of messages to process, default is 0 wich indicates no limit."""
-
         processed = 0
         while not self.receive_queue.empty():
             message = self.receive_queue.get()

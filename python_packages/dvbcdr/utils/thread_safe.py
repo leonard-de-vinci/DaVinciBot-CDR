@@ -11,7 +11,7 @@ class ThreadSafeDict(dict):
         self._lock.acquire()
         return self
 
-    def __exit__(self, type, value, traceback) :
+    def __exit__(self, ex_type, ex_value, ex_traceback) :
         self._lock.release()
 
 class DataEvent:
