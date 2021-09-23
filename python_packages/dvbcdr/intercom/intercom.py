@@ -35,6 +35,24 @@ class Intercom:
     crc_cache: Dict[str, Tuple[int, str]] = {}
     """Stores crc code and ip for each subscribed topic."""
 
+    def __get_topic_info(self, topic) -> Tuple[int, str]:
+        """Internal method to retreive and cache the crc24 code and corresponding ip of a topic."""
+        if not isinstance(topic, str):
+            raise TypeError("topic needs to be a string")
+
+        if topic not in self.crc_cache:
+            topic_code = crc24(topic.lower())
+            value = topic_code
+            topic_ip = "224"
+
+            for _ in range(3):
+                topic_ip += "." + str((value & 0xff0000) >> 16)
+                value <<= 8
+
+            self.crc_cache[topic] = (topic_code, topic_ip)
+
+        return self.crc_cache[topic]
+
     def __intercom_thread(self):
         """Internal method used to setup the socket and receive messages.
         \nThis method MUST NOT be run on the main thread as it is blocking the execution."""
@@ -114,24 +132,6 @@ class Intercom:
             self.wait_events[topic_code] = DataEvent()
 
         return self.wait_events[topic_code].wait()
-
-    def __get_topic_info(self, topic) -> Tuple[int, str]:
-        """Internal method to retreive and cache the crc24 code and corresponding ip of a topic."""
-        if not isinstance(topic, str):
-            raise TypeError("topic needs to be a string")
-
-        if topic not in self.crc_cache:
-            topic_code = crc24(topic.lower())
-            value = topic_code
-            topic_ip = "224"
-
-            for _ in range(3):
-                topic_ip += "." + str((value & 0xff0000) >> 16)
-                value <<= 8
-
-            self.crc_cache[topic] = (topic_code, topic_ip)
-
-        return self.crc_cache[topic]
 
     def run_callbacks(self, process_limit=0):
         """Run on any thread the callbacks for the messages received on the intercom thread.
