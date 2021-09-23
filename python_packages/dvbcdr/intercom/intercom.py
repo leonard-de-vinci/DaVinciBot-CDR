@@ -55,7 +55,9 @@ class Intercom:
 
     def __intercom_thread(self):
         """Internal method used to setup the socket and receive messages.
-        \nThis method MUST NOT be run on the main thread as it is blocking the execution."""
+        
+        This method MUST NOT be run on the main thread as it is blocking the execution and never returns.
+        """
         sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM, socket.IPPROTO_UDP)
         sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
         sock.setsockopt(socket.IPPROTO_IP, socket.IP_MULTICAST_TTL, MULTICAST_TTL)
@@ -93,8 +95,17 @@ class Intercom:
 
             self.socket_ready.wait()
 
-    def subscribe(self, topics: Union[str, List[str]], action: Callable[[str, Any], None]) -> int:
-        """Registers a callback for one or multiple topics. Returns the id of the newly registered callback."""
+    def subscribe(self, topics: Union[str, List[str]], action: Callable[[Any], None]) -> int:
+        """Registers a callback for one or multiple topics.
+        
+        Args:
+            topics: A string or a list of strings representing the topics you want to subscribe to.
+            action: The method that should be called when a message is received on one of the given topics.
+                This method takes a single argument, the message data, and should not return anything.
+
+        Returns:
+            The id of the registered callback that should be used to remove that subscription.
+        """
         self.start()
 
         if isinstance(topics, str):
@@ -120,6 +131,19 @@ class Intercom:
         return callback.ref
 
     def wait_for_topic(self, topic: str, autosubscribe=True):
+        """Blocks the execution until a message from the given topic is received and returns this message.
+        
+        Args:
+            topic: A string corresponding to the topic the intercom needs to wait for.
+            autosubscribe: If the given topic was not 'subscribed' by a call to `intercom.Subscribe()`, it automatically
+                call the method. Raises a ValueError if this is set to False and the topic is not subscribed. Defaults to True.
+                
+        Returns:
+            The data of the first message received on the given topic after the call of this method.
+            
+        Raises:
+            ValueError: The given topic is not subscribed and autosubscribe is set to False.
+        """
         if topic not in self.crc_cache:
             if autosubscribe:
                 self.subscribe(topic, lambda *args: None)
@@ -135,7 +159,10 @@ class Intercom:
 
     def run_callbacks(self, process_limit=0):
         """Run on any thread the callbacks for the messages received on the intercom thread.
-        \n`process_limit` limits the numbers of messages to process, default is 0 wich indicates no limit."""
+
+        Args:
+            process_limit: Limits the numbers of messages to process, default is 0 wich indicates no limit.
+        """
         processed = 0
         while not self.receive_queue.empty():
             message = self.receive_queue.get()
@@ -155,12 +182,20 @@ class Intercom:
                 self.run_callbacks()
 
     def publish(self, message: Message) -> None:
-        """Publishes a message to all the subscribers of a topic."""
+        """Publishes a message to all the subscribers of a topic.
+        
+        Args:
+            message: A `message` object containing the topic and the message data.
+        """
         self.start()
 
         topic_info = self.__get_topic_info(message.topic)
         self.com_socket.sendto(PACKET_START + topic_info[0].to_bytes(3, "big") + bytes(json.dumps(message.message_data), "utf-8") + PACKET_END, (topic_info[1], MULTICAST_PORT))
 
     def publish_data(self, topic: str, message_data):
-        """Publishes data to a topic without the need of creating a `Message` object."""
+        """Publishes data to a topic without the need of creating a `Message` object.
+        
+        Args:
+            topic: A string representing the topic on which the message should be sent.
+        """
         self.publish(Message(topic, message_data))
