@@ -15,7 +15,7 @@ from .messages import Message, ReceivedMessage
 
 MULTICAST_TTL = 2
 MULTICAST_PORT = 5007
-MULTICAST_BUFFSIZE = 2048
+MULTICAST_BUFFSIZE = 1024
 
 # always 4 bytes each
 PACKET_START = b"\0DVB"
@@ -176,6 +176,7 @@ class Intercom:
 
     def wait_here(self):
         """Blocks the current thread and run callbacks until the program closes."""
+        self.run_callbacks() # run waiting callbacks first
         while True:
             with self.__message_received:
                 self.__message_received.wait()
