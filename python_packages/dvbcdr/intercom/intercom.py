@@ -187,6 +187,13 @@ class Intercom:
                 self.__message_received.wait()
                 self.run_callbacks()
 
+    def wait_in_new_thread(self) -> Thread:
+        """Creates a new thread and run callbacks on it until the program closes."""
+        new_thread = Thread(target=self.wait_here, daemon=True)
+        new_thread.start()
+
+        return new_thread
+
     def publish(self, message: Message) -> None:
         """
         Publishes a message to all the subscribers of a topic.
