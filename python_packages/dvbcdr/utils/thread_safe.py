@@ -1,18 +1,20 @@
 from threading import Event, Lock
 from typing import Any
 
+
 class ThreadSafeDict(dict):
-    def __init__(self, *args, **kwargs) :
+    def __init__(self, *args, **kwargs):
         dict.__init__(self, *args, **kwargs)
 
         self._lock = Lock()
 
-    def __enter__(self) :
+    def __enter__(self):
         self._lock.acquire()
         return self
 
-    def __exit__(self, ex_type, ex_value, ex_traceback) :
+    def __exit__(self, ex_type, ex_value, ex_traceback):
         self._lock.release()
+
 
 class DataEvent:
     __data = None

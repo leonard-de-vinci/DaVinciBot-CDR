@@ -21,6 +21,7 @@ MULTICAST_BUFFSIZE = 1024
 PACKET_START = b"\0DVB"
 PACKET_END = b"\0CDR"
 
+
 class Intercom:
     receive_thread: threading.Thread = None
     socket_ready = Event()
@@ -54,8 +55,9 @@ class Intercom:
         return self.crc_cache[topic]
 
     def __intercom_thread(self):
-        """Internal method used to setup the socket and receive messages.
-        
+        """
+        Internal method used to setup the socket and receive messages.
+
         This method MUST NOT be run on the main thread as it is blocking the execution and never returns.
         """
         sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM, socket.IPPROTO_UDP)
@@ -69,7 +71,7 @@ class Intercom:
         while True:
             try:
                 received_bytes = sock.recv(MULTICAST_BUFFSIZE)
-                if len(received_bytes) > (3+4*2) and received_bytes[:4] == PACKET_START and received_bytes[-4:] == PACKET_END:
+                if len(received_bytes) > (3 + 4 * 2) and received_bytes[:4] == PACKET_START and received_bytes[-4:] == PACKET_END:
                     topic_code = int.from_bytes(received_bytes[4:7], "big")
                     received_data = json.loads(received_bytes[7:-4])
 
@@ -83,7 +85,7 @@ class Intercom:
                         self.__message_received.notify_all()
 
             except BlockingIOError:
-                pass # nothing to receive
+                pass  # nothing to receive
             except Exception:
                 print("Intercom thread error", sys.exc_info()[0])
 
@@ -95,9 +97,10 @@ class Intercom:
 
             self.socket_ready.wait()
 
-    def subscribe(self, topics: Union[str, List[str]], action: Callable[[Any], None]) -> int:
-        """Registers a callback for one or multiple topics.
-        
+    def subscribe(self, topics: Union[str, List[str]], action: Callable[[Any], None] = lambda: None) -> int:
+        """
+        Registers a callback for one or multiple topics.
+
         Args:
             topics: A string or a list of strings representing the topics you want to subscribe to.
             action: The method that should be called when a message is received on one of the given topics.
@@ -131,22 +134,23 @@ class Intercom:
         return callback.ref
 
     def wait_for_topic(self, topic: str, autosubscribe=True):
-        """Blocks the execution until a message from the given topic is received and returns this message.
-        
+        """
+        Blocks the execution until a message from the given topic is received and returns this message.
+
         Args:
             topic: A string corresponding to the topic the intercom needs to wait for.
             autosubscribe: If the given topic was not 'subscribed' by a call to `intercom.Subscribe()`, it automatically
                 call the method. Raises a ValueError if this is set to False and the topic is not subscribed. Defaults to True.
-                
+
         Returns:
             The data of the first message received on the given topic after the call of this method.
-            
+
         Raises:
             ValueError: The given topic is not subscribed and autosubscribe is set to False.
         """
         if topic not in self.crc_cache:
             if autosubscribe:
-                self.subscribe(topic, lambda *args: None)
+                self.subscribe(topic, lambda: None)
             else:
                 raise ValueError("topic is not currently subscribed and autosubscribe is not True")
 
@@ -158,7 +162,8 @@ class Intercom:
         return self.wait_events[topic_code].wait()
 
     def run_callbacks(self, process_limit=0):
-        """Run on any thread the callbacks for the messages received on the intercom thread.
+        """
+        Run on any thread the callbacks for the messages received on the intercom thread.
 
         Args:
             process_limit: Limits the numbers of messages to process, default is 0 wich indicates no limit.
@@ -183,8 +188,9 @@ class Intercom:
                 self.run_callbacks()
 
     def publish(self, message: Message) -> None:
-        """Publishes a message to all the subscribers of a topic.
-        
+        """
+        Publishes a message to all the subscribers of a topic.
+
         Args:
             message: A `message` object containing the topic and the message data.
         """
@@ -193,9 +199,10 @@ class Intercom:
         topic_info = self.__get_topic_info(message.topic)
         self.com_socket.sendto(PACKET_START + topic_info[0].to_bytes(3, "big") + bytes(json.dumps(message.message_data), "utf-8") + PACKET_END, (topic_info[1], MULTICAST_PORT))
 
-    def publish_data(self, topic: str, message_data):
-        """Publishes data to a topic without the need of creating a `Message` object.
-        
+    def publish_data(self, topic: str, message_data: Any = None):
+        """
+        Publishes data to a topic without the need of creating a `Message` object.
+
         Args:
             topic: A string representing the topic on which the message should be sent.
         """

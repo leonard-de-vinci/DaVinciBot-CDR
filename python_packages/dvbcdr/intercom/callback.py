@@ -1,6 +1,7 @@
 import random
 from typing import Any, Callable, List
 
+
 class Callback:
     """Represents a method associated with one or more intercom topics."""
 
@@ -10,13 +11,13 @@ class Callback:
     ref = random.getrandbits(32)
 
     def __init__(self, topic_codes: List[int], action: Callable[[Any], None]):
-        """Links a method to its corresponding subscribed topic codes.
+        """
+        Links a method to its corresponding subscribed topic codes.
 
         Args:
             topic_codes: A list of int, the CRC24 codes of the topics that callback should be executed for.
             action: The method that should be called. Takes a single argument, the message data and should not return anything.
         """
-
         if not callable(action):
             raise TypeError("action is not callable")
 
@@ -31,11 +32,11 @@ class Callback:
         self.action = action
 
     def run(self, message_data):
-        """Runs this callback action with a message_data.
-        
+        """
+        Runs this callback action with a message_data.
+
         Args:
             message_data: The received message data that should be given to the action.
         """
-
         if self.action is not None:
-           self.action(message_data)
+            self.action(message_data)

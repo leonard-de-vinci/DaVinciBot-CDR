@@ -1,10 +1,13 @@
 from dvbcdr.intercom import Intercom
 
+
 def recv_1(message_data):
     print("received from 'topic_1':", message_data)
 
+
 def recv_2(message_data):
     print("received from 'topic_2' or 'topic_3':", message_data)
+
 
 intercom = Intercom()
 intercom.subscribe("topic_1", recv_1)
