@@ -97,7 +97,7 @@ class Intercom:
 
             self.socket_ready.wait()
 
-    def subscribe(self, topics: Union[str, List[str]], action: Callable[[Any], None] = lambda: None) -> int:
+    def subscribe(self, topics: Union[str, List[str]], action: Callable[[Any], None] = lambda *args: None) -> int:
         """
         Registers a callback for one or multiple topics.
 
@@ -150,7 +150,7 @@ class Intercom:
         """
         if topic not in self.crc_cache:
             if autosubscribe:
-                self.subscribe(topic, lambda: None)
+                self.subscribe(topic, lambda *args: None)
             else:
                 raise ValueError("topic is not currently subscribed and autosubscribe is not True")
 
@@ -181,7 +181,7 @@ class Intercom:
 
     def wait_here(self):
         """Blocks the current thread and run callbacks until the program closes."""
-        self.run_callbacks() # run waiting callbacks first
+        self.run_callbacks()  # run waiting callbacks first
         while True:
             with self.__message_received:
                 self.__message_received.wait()
