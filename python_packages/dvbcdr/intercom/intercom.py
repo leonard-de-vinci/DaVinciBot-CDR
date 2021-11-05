@@ -11,7 +11,7 @@ from queue import Queue
 from ..utils.thread_safe import DataEvent, ThreadSafeDict
 from ..utils.crc import crc24
 from .callback import Callback
-from .messages import Message, ReceivedMessage
+from .messages import ReceivedMessage
 
 MULTICAST_TTL = 2
 MULTICAST_PORT = 5007
@@ -36,6 +36,15 @@ class Intercom:
     crc_cache: Dict[str, Tuple[int, str]] = {}
     """Stores crc code and ip for each subscribed topic."""
 
+    def __topic_code_to_ip(self, code):
+        topic_ip = "224"
+
+        for _ in range(3):
+            topic_ip += "." + str((code & 0xff0000) >> 16)
+            code <<= 8
+
+        return topic_ip
+
     def __get_topic_info(self, topic) -> Tuple[int, str]:
         """Internal method to retreive and cache the crc24 code and corresponding ip of a topic."""
         if not isinstance(topic, str):
@@ -43,12 +52,7 @@ class Intercom:
 
         if topic not in self.crc_cache:
             topic_code = crc24(topic.lower())
-            value = topic_code
-            topic_ip = "224"
-
-            for _ in range(3):
-                topic_ip += "." + str((value & 0xff0000) >> 16)
-                value <<= 8
+            topic_ip = self.__topic_code_to_ip(topic_code)
 
             self.crc_cache[topic] = (topic_code, topic_ip)
 
@@ -133,6 +137,28 @@ class Intercom:
 
         return callback.ref
 
+    def subscribe_raw(self, topic_code: int, action: Callable[[Any], None] = lambda *args: None) -> int:
+        """
+        Registers a callback for a single topic.
+
+        Args:
+            topic_code: The crc24 code of the topic you want to subscribe to.
+            action: The method that should be called when a message is received on the given topic.
+                This method takes a single argument, the message data, and should not return anything.
+
+        Returns:
+            The id of the registered callback that should be used to remove that subscription.
+        """
+        self.start()
+
+        topic_ip = self.__topic_code_to_ip(topic_code)
+        self.com_socket.setsockopt(socket.IPPROTO_IP, socket.IP_ADD_MEMBERSHIP, struct.pack("4sl", socket.inet_aton(topic_ip), socket.INADDR_ANY))
+
+        callback = Callback([topic_code], action)
+        self.callbacks.append(callback)
+
+        return callback.ref
+
     def wait_for_topic(self, topic: str, autosubscribe=True):
         """
         Blocks the execution until a message from the given topic is received and returns this message.
@@ -194,23 +220,21 @@ class Intercom:
 
         return new_thread
 
-    def publish(self, message: Message) -> None:
+    def publish(self, topic: str, message_data: Any) -> None:
         """
         Publishes a message to all the subscribers of a topic.
 
         Args:
-            message: A `message` object containing the topic and the message data.
+            topic: A string representing the topic.
+            message_data: Anything representing the data to send.
         """
         self.start()
 
-        topic_info = self.__get_topic_info(message.topic)
-        self.com_socket.sendto(PACKET_START + topic_info[0].to_bytes(3, "big") + bytes(json.dumps(message.message_data), "utf-8") + PACKET_END, (topic_info[1], MULTICAST_PORT))
+        topic_info = self.__get_topic_info(topic)
+        self.com_socket.sendto(PACKET_START + topic_info[0].to_bytes(3, "big") + bytes(json.dumps(message_data), "utf-8") + PACKET_END, (topic_info[1], MULTICAST_PORT))
 
-    def publish_data(self, topic: str, message_data: Any = None):
-        """
-        Publishes data to a topic without the need of creating a `Message` object.
+    def publish_raw(self, topic_code: int, message_data: Any) -> None:
+        self.start()
 
-        Args:
-            topic: A string representing the topic on which the message should be sent.
-        """
-        self.publish(Message(topic, message_data))
+        topic_ip = self.__topic_code_to_ip(topic_code)
+        self.com_socket.sendto(PACKET_START + topic_code.to_bytes(3, "big") + bytes(json.dumps(message_data), "utf-8") + PACKET_END, (topic_ip, MULTICAST_PORT))
