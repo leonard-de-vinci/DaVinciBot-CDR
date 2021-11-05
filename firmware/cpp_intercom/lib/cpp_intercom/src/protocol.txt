@@ -1,0 +1,22 @@
+JSON exchanged strings are kept small to avoid sending and receiving useless bytes of data.
+This document explains how data is transfered between the embedded device and the python process.
+
+In every message, there is the `c` parameter which is the command.
+ - 0 is for the device identification. If the device receives this command, it will send back the command 0 with its deviceId in the `v` parameter.
+ - 1 is for ping. The device will wait for a ping after each subscribe and after its initialization.
+ - 2 is for sending and receiving data. Each message contains 2 or 3 additionals parameters described below.
+
+Parameters for command 2 (data):
+ - If t is 255, then it's a subscribe command from the device. The crc24-ed data is sent in the `s` parameter.
+   The python host will then send a ping back. If this response is not received within 500ms, the subscribe message is sent again.
+ - If t is 0-1-2-3, then it's a data message. The `s` parameter contains the crc24-ed topic (s for subject) and `v` contains the value.
+
+List of data types:
+ 0  int
+ 1  String
+ 2  float
+ 3  double
+
+
+TODO:
+ - Add a special command for the emergency stop.
