@@ -16,6 +16,20 @@ class ThreadSafeDict(dict):
         self._lock.release()
 
 
+class ThreadSafeList(list):
+    def __init__(self, *args, **kwargs):
+        list.__init__(self, *args, **kwargs)
+
+        self._lock = Lock()
+
+    def __enter__(self):
+        self._lock.acquire()
+        return self
+
+    def __exit__(self, ex_type, ex_value, ex_traceback):
+        self._lock.release()
+
+
 class DataEvent:
     __data = None
 

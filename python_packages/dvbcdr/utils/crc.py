@@ -5,12 +5,13 @@ CRC_INIT = 0xb704ce
 MSB_MASK = 1 << 23
 CRC_MASK = ((MSB_MASK - 1) << 1) | 1
 
+
 def crc24(data: Union[str, int, bytes]) -> int:
     """Computes the CRC24 code of an input data.
-    
+
     Args:
         data: The data that should be computed. Can be an int, a string or a `bytes` object.
-        
+
     Returns:
         A 3-bytes int corresponding to the CRC24 value of the input."""
 
@@ -30,4 +31,3 @@ def crc24(data: Union[str, int, bytes]) -> int:
                 crc ^= CRC_POLY
 
     return crc & CRC_MASK
-    
