@@ -17,8 +17,8 @@ def check_ports():
     ports = serial.tools.list_ports.comports()
     with opened_ports:
         for port in ports:
-            if(port.name not in opened_ports):
-                port_thread = threading.Thread(target=handle_port, args=(port.name,))
+            if(port.device not in opened_ports):
+                port_thread = threading.Thread(target=handle_port, args=(port.device,))
                 port_thread.start()
 
 
@@ -36,14 +36,14 @@ def __data_received(port_serial, data):
         port_serial.write(bytes("{\"c\":2,\"t\":" + str(data_type) + ",\"d\":" + str(data) + "}\n", "utf-8"))
 
 
-def handle_port(port_name):
+def handle_port(port_path):
     with opened_ports:
-        opened_ports.append(port_name)
-    print("Opening", port_name + "...")
+        opened_ports.append(port_path)
+    print("Opening", port_path + "...")
 
     try:
         baudrate = config.get("baudrate", 115200)
-        port_serial = serial.Serial(port_name, baudrate=baudrate)
+        port_serial = serial.Serial(port_path, baudrate=baudrate)
         port_serial.write(b"{\"c\":0}")
 
         # creating an Intercom instance
@@ -54,7 +54,7 @@ def handle_port(port_name):
             try:
                 data = json.loads(raw_data)
             except JSONDecodeError:
-                print("Invalid JSON on", port_name, raw_data.decode("utf-8"))
+                print("Invalid JSON on", port_path, raw_data.decode("utf-8"))
                 continue
 
             if "c" in data:
@@ -68,24 +68,24 @@ def handle_port(port_name):
                     port_serial.write(b"{\"c\":1}")
                 elif command == 2:
                     if "t" in data and "s" in data:
-                        type = data["t"]
+                        data_type = data["t"]
                         crc_subject = data["s"]
 
-                        if "d" in data:
-                            data = data["d"]
+                        if "v" in data:
+                            data = data["v"]
 
-                        if type in [0, 1, 2]:
+                        if data_type in [0, 1, 2]:
                             intercom.publish_raw(crc_subject, data)
-                        elif type == 255:
+                        elif data_type == 255:
                             intercom.subscribe_raw(crc_subject, lambda r: __data_received(port_serial, r))
                             port_serial.write(b"{\"c\":1}")
     except Exception as exception:
-        print("Error on serial port:", port_name, exception)
+        print("Error on serial port:", port_path, exception)
 
     # TODO: intercom.close()
     # intercom.close()
     with opened_ports:
-        opened_ports.remove(port_name)
+        opened_ports.remove(port_path)
 
 
 def main():
