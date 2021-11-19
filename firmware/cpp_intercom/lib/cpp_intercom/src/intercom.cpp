@@ -24,7 +24,7 @@ void Intercom::sendDeviceId() {
 void Intercom::internalReceive() {
     while(Serial.available() == 0);
 
-    deserializeJson(_jsonDocument, Serial.readStringUntil("\n"));
+    deserializeJson(_jsonDocument, Serial.readStringUntil('\n'));
 
     _lastCommand = _jsonDocument["c"];
     if(_lastCommand == 0)
