@@ -3,7 +3,7 @@
 
 class Intercom {
     public: 
-        static void init(String deviceId, int speed = 115200);
+        static void init(String deviceId, unsigned long speed);
 
         static void publish(String topic, int value);
         static void publish(String topic, String value);

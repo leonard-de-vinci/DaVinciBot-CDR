@@ -3,7 +3,7 @@
 #include <ArduinoJson.h>
 
 bool Intercom::_initialized = false;
-void Intercom::init(String deviceId, int speed = 115200) {
+void Intercom::init(String deviceId, unsigned long speed) {
     if(_initialized)
         return;
 
@@ -22,7 +22,9 @@ void Intercom::sendDeviceId() {
 }
 
 void Intercom::internalReceive() {
-    deserializeJson(_jsonDocument, Serial);
+    while(Serial.available() == 0);
+
+    deserializeJson(_jsonDocument, Serial.readStringUntil("\n"));
 
     _lastCommand = _jsonDocument["c"];
     if(_lastCommand == 0)
