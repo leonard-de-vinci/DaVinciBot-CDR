@@ -4,5 +4,5 @@ setup(
     packages=find_packages(),
     name="dvbcdr",
     version="0.0.1-alpha",
-    install_requires=["numpy", "pyserial", "pyyaml"]
+    install_requires=["numpy", "pyserial", "pyyaml", "pygame", "pyaccesspoint"]
 )
