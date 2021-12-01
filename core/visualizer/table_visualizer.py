@@ -10,11 +10,11 @@ os.chdir(os.path.dirname(os.path.abspath(__file__)))
 pygame.init()
 
 # CONSTANTS
-irl_size = (300, 200)
+irl_size = (3000, 2000)
 table_size = (1200, 800)
 margins = (120, 80)
 
-robot_start_position = table_to_mouse((20, 65), table_size, irl_size, margins)
+robot_start_position = table_to_mouse((200, 650), table_size, irl_size, margins)
 
 
 # PYGAME SETUP
@@ -22,8 +22,8 @@ window = pygame.display.set_mode((1200 + 2 * margins[0], 800 + 2 * margins[1]), 
 pygame.display.set_caption("Table Visualizer")
 pygame.display.set_icon(pygame.image.load("images/logo_ageofbots.png"))
 
-table_image = pygame.transform.scale(pygame.image.load("images/table.png"), table_to_mouse((300, 200), table_size, irl_size))
-robot_image = pygame.transform.scale(pygame.image.load("images/dvb.png"), table_to_mouse((30, 30), table_size, irl_size))
+table_image = pygame.transform.scale(pygame.image.load("images/table.png"), table_to_mouse((3000, 2000), table_size, irl_size))
+robot_image = pygame.transform.scale(pygame.image.load("images/dvb.png"), table_to_mouse((300, 300), table_size, irl_size))
 
 running = True
 clock = pygame.time.Clock()
