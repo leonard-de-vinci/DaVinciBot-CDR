@@ -22,18 +22,34 @@ def check_ports():
                 port_thread.start()
 
 
+def __get_data_type(data):
+    if isinstance(data, int):
+        return (0, int)
+    elif isinstance(data, str):
+        return (1, str)
+    elif isinstance(data, float):
+        return (2, float)
+
+    return (-1, None)
+
+
 def __data_received(port_serial, data):
-    data_type = -1
-    if data is int:
-        data_type = 0
-    elif data is str:
+    data_type, = __get_data_type(data)
+    length = -1
+    if data_type == 1:
         data = "\"" + data.replace("\"", "\\\"") + "\""
         data_type = 1
-    elif data is float:
-        data_type = 2
+    elif data_type == -1:
+        if isinstance(data, tuple):
+            data = list(data)
+
+        if isinstance(data, list):
+            length = len(data)
+            data_type, type_ctor = __get_data_type(data[0])
+            data = "[" + ",".join([("\"" + x + "\"" if data_type == 1 else str(x)) for x in data if type(x) == type_ctor]) + "]"
 
     if data_type in [0, 1, 2]:
-        port_serial.write(bytes("{\"c\":2,\"t\":" + str(data_type) + ",\"d\":" + str(data) + "}\n", "utf-8"))
+        port_serial.write(bytes("{\"c\":2,\"t\":" + str(data_type) + (",\"l\":" + str(length) if length >= 0 else "") + ",\"d\":" + str(data) + "}\n", "utf-8"))
 
 
 def handle_port(port_path):

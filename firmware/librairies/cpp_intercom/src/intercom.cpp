@@ -280,7 +280,7 @@ void Intercom::publish(String topic, int* ptr, int length) {
             Serial.print(F(","));
         Serial.print(ptr[i]);
     }
-    Serial.println(F("]"));
+    Serial.println(F("]}"));
 }
 
 void Intercom::publish(String topic, String* ptr, int length) {
@@ -297,7 +297,7 @@ void Intercom::publish(String topic, String* ptr, int length) {
         Serial.print(ptr[i]);
         Serial.print(F("\""));
     }
-    Serial.println(F("]"));
+    Serial.println(F("]}"));
 }
 
 void Intercom::publish(String topic, float* ptr, int length) {
@@ -312,7 +312,7 @@ void Intercom::publish(String topic, float* ptr, int length) {
             Serial.print(F(","));
         Serial.print(ptr[i]);
     }
-    Serial.println(F("]"));
+    Serial.println(F("]}"));
 }
 
 void Intercom::publish(String topic, double* ptr, int length) {
@@ -328,5 +328,5 @@ void Intercom::publish(String topic, double* ptr, int length) {
             Serial.print(F(","));
         Serial.print(ptr[i]);
     }
-    Serial.println(F("]"));
+    Serial.println(F("]}"));
 }
