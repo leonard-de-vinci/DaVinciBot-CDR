@@ -9,6 +9,9 @@ import os
 os.chdir(os.path.dirname(os.path.abspath(__file__)))
 pygame.init()
 
+intercom = Intercom()
+intercom.wait_in_new_thread()
+
 # CONSTANTS
 irl_size = (3000, 2000)
 table_size = (1200, 800)
@@ -47,17 +50,25 @@ def set_status_part(key, value):
 # this value should be reset to False when a new position is set or when the requested rotation is reached
 is_rotation_requested = False
 
-intercom = Intercom()
-intercom.wait_in_new_thread()
+
+def table_clicked():
+    # [*(tuple)] transforms a tuple into a list/array with the * (= deconstruct) operator
+    intercom.publish("move_robot", [*mouse_to_table(pygame.mouse.get_pos(), table_size, irl_size, margins), -1])
+
+
+def rotation_set(value):
+    pass
 
 
 # SCENE SETUP
 status_text = scene.add_element("status_text", PygCdrText("", font_size=15, pos=(3, 3)))
 scene.add_element("table", PygCdrObject(object=table_image, pos=(margins[0], margins[1]), size=table_size, cursor_data=("diamond", pygame.cursors.diamond),
                                         onhover=lambda: set_status_part("cursor_position", mouse_to_table(pygame.mouse.get_pos(), table_size, irl_size, margins)),
-                                        onleave=lambda: set_status_part("cursor_position", None)))
+                                        onleave=lambda: set_status_part("cursor_position", None),
+                                        onclick=table_clicked))
 scene.add_element("rotation_text", PygCdrText("Rotation (0°):", font_size=15, pos=(3, 25)))
-scene.add_element("rotation_slider", PygCdrSlider(0, 359, 1, 0, "white", "grey", "grey40", pos=(130, 25)))
+scene.add_element("rotation_slider", PygCdrSlider(0, 359, 1, 0, "white", "grey", "grey40", pos=(130, 25),
+                                                  oninput=rotation_set))
 
 scene.add_element("robot_preview", PygCdrObject(object=robot_image, pos=robot_start_position, size=robot_image.get_size(), anchor=(0.5, 0.5)))
 

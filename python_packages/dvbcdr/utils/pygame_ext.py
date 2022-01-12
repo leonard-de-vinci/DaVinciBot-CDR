@@ -155,7 +155,7 @@ class PygCdrText(PygCdrObject):
 
 
 class PygCdrSlider(PygCdrObject):
-    def __init__(self, min_value, max_value, step, default_value, bg_color, line_color, handle_color, handle_radius=10, line_size=10, onchange=None, **kwargs):
+    def __init__(self, min_value, max_value, step, default_value, bg_color, line_color, handle_color, handle_radius=10, line_size=10, onchange=None, oninput=None, **kwargs):
         self.min_value = min_value
         self.max_value = max_value
         self.step = step
@@ -167,6 +167,9 @@ class PygCdrSlider(PygCdrObject):
         self.line_size = line_size
 
         self.onchange = onchange
+        self.oninput = oninput
+        self.original_onreleased = kwargs.get("onreleased", None)
+        kwargs["onreleased"] = lambda rel_pos: self.__on_released(rel_pos)
         self.original_onhover = kwargs.get("onhover", None)
         kwargs["onhover"] = lambda rel_pos: self.__onhover(rel_pos)
         self.original_onclick = kwargs.get("onclick", None)
@@ -184,6 +187,18 @@ class PygCdrSlider(PygCdrObject):
             line_size = half_size
 
         self.render_slider()
+
+    def __onreleased(self, relative_mouse_pos):
+        if self.original_onreleased is not None:
+            if self.original_onreleased.__code__.co_argcount == 1:
+                self.original_onreleased(relative_mouse_pos)
+            else:
+                self.original_onreleased()
+
+        if self.oninput.__code__.co_argcount == 1:
+            self.oninput(self.current_value)
+        else:
+            self.oninput()
 
     def __onhover(self, relative_mouse_pos):
         if self.is_clicked:
