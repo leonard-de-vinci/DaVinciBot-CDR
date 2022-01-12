@@ -1,4 +1,7 @@
-def round_significant_decimals(number, significant_decimals=3):
+from typing import Union
+
+
+def round_significant_decimals(number: Union[float, int], significant_decimals: int = 3) -> Union[float, int]:
     str_value = f"{number:.16f}"
     dot_index = str_value.find(".")
 
