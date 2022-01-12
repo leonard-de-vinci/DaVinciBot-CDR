@@ -3,6 +3,7 @@ import socket
 import json
 import struct
 import sys
+import warnings
 
 from typing import Callable, Dict, List, Tuple, Union, Any
 from threading import Condition, Event, Thread
@@ -30,6 +31,7 @@ class Intercom:
     receive_queue: "Queue[ReceivedMessage]" = Queue()
 
     callbacks: List[Callback] = []
+    event_callbacks: List[Callback] = []
     wait_events: Dict[int, DataEvent] = ThreadSafeDict()
     __message_received = Condition()
 
@@ -52,6 +54,9 @@ class Intercom:
 
         if topic not in self.crc_cache:
             topic_code = crc24(topic.lower())
+            if topic_code == 0:
+                warnings.warn("Topic '" + topic + "' results in a topic-code of 0 which is an invalid number, please use another topic name.", BytesWarning)
+
             topic_ip = self.__topic_code_to_ip(topic_code)
 
             self.crc_cache[topic] = (topic_code, topic_ip)
@@ -64,6 +69,9 @@ class Intercom:
 
         This method MUST NOT be run on the main thread as it is blocking the execution and never returns.
         """
+        if threading.current_thread() is threading.main_thread():
+            raise RuntimeError("__intercom_thread can't be run on the main thread!")
+
         sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM, socket.IPPROTO_UDP)
         sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
         sock.setsockopt(socket.IPPROTO_IP, socket.IP_MULTICAST_TTL, MULTICAST_TTL)
@@ -159,6 +167,49 @@ class Intercom:
 
         return callback.ref
 
+    def on_events(self, action: Callable[[str], None] = lambda *args: None) -> int:
+        """
+        Registers a callback for all received events.
+        An event is a message without any additional data, just an action that happened for example.
+
+        Args:
+            action: The method that should be called when an event is received.
+                It takes a single argument, the event name, and should not return anything.
+
+        Returns:
+            The id of the registered callback that should be used to remove that subscription.
+        """
+        self.start()
+        callback = Callback([0], action)
+
+        if len(self.event_callbacks) == 0:
+            event_ip = self.__topic_code_to_ip(0)
+            self.com_socket.setsockopt(socket.IPPROTO_IP, socket.IP_ADD_MEMBERSHIP, struct.pack("4sl", socket.inet_aton(event_ip), socket.INADDR_ANY))
+
+        self.event_callbacks.append(callback)
+
+        # a negative ref indicates that this is an event callback
+        return -callback.ref
+
+    def on_event(self, event_name: str, action: Callable[[None], None] = lambda *args: None) -> int:
+        """
+        Registers a callback for a specific event.
+        An event is a message without any additional data, just an action that happened for example.
+
+        Args:
+            event_name: The name of the event you want to subscribe to.
+            action: The method that should be called when an event is received.
+                It takes no arguments and should not return anything.
+
+        Returns:
+            The id of the registered callback that should be used to remove that subscription.
+        """
+
+        if not callable(action):
+            return 0
+
+        return self.on_events(lambda received_name: action() if received_name == event_name else None)
+
     def wait_for_topic(self, topic: str, autosubscribe=True):
         """
         Blocks the execution until a message from the given topic is received and returns this message.
@@ -197,9 +248,13 @@ class Intercom:
         processed = 0
         while not self.receive_queue.empty():
             message = self.receive_queue.get()
-            for callback in self.callbacks:
-                if message.topic_code in callback.topic_codes:
+            if message.topic_code == 0 and isinstance(message.message_data, str):
+                for callback in self.event_callbacks:
                     callback.run(message.message_data)
+            else:
+                for callback in self.callbacks:
+                    if message.topic_code in callback.topic_codes:
+                        callback.run(message.message_data)
 
             processed += 1
             if process_limit > 0 and processed >= process_limit:
@@ -220,7 +275,7 @@ class Intercom:
 
         return new_thread
 
-    def publish(self, topic: str, message_data: Any) -> None:
+    def publish(self, topic: str, message_data: Any = None) -> None:
         """
         Publishes a message to all the subscribers of a topic.
 
@@ -233,8 +288,12 @@ class Intercom:
         topic_info = self.__get_topic_info(topic)
         self.com_socket.sendto(PACKET_START + topic_info[0].to_bytes(3, "big") + bytes(json.dumps(message_data), "utf-8") + PACKET_END, (topic_info[1], MULTICAST_PORT))
 
-    def publish_raw(self, topic_code: int, message_data: Any) -> None:
+    def publish_raw(self, topic_code: int, message_data: Any = None) -> None:
         self.start()
 
         topic_ip = self.__topic_code_to_ip(topic_code)
         self.com_socket.sendto(PACKET_START + topic_code.to_bytes(3, "big") + bytes(json.dumps(message_data), "utf-8") + PACKET_END, (topic_ip, MULTICAST_PORT))
+
+    def publish_event(self, event_name: str) -> None:
+        self.start()
+        self.publish_raw(0, event_name)

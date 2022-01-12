@@ -1,6 +1,9 @@
 #include <Arduino.h>
 #include <ArduinoJson.h>
 
+#define DEFAULT_INTERCOM_SPEED 115200
+#define MAX_RECEIVED_EVENTS 16
+
 class Intercom {
     public: 
         static void init(String deviceId, unsigned long speed);
@@ -40,10 +43,15 @@ class Intercom {
         static bool instantReceiveString(String* topic, String* value);
         static bool instantReceiveFloat(String* topic, float* value);
         static bool instantReceiveDouble(String* topic, double* value);
-        static bool instantReceiveIntArray(String* topic, int* value, int* length);
-        static bool instantReceiveStringArray(String* topic, String* value, int* length);
-        static bool instantReceiveFloatArray(String* topic, float* value, int* length);
-        static bool instantReceiveDoubleArray(String* topic, double* value, int* length);
+        static bool instantReceiveIntArray(String* topic, int* ptr, int* length);
+        static bool instantReceiveStringArray(String* topic, String* ptr, int* length);
+        static bool instantReceiveFloatArray(String* topic, float* ptr, int* length);
+        static bool instantReceiveDoubleArray(String* topic, double* ptr, int* length);
+
+        static bool hasReceivedEvent(String eventName);
+        static bool instantHasReceivedEvent(String eventName);
+        static void clearReceivedEvents();
+        static void publishEvent(String eventName);
 
     private:
         static bool _initialized;
@@ -59,4 +67,9 @@ class Intercom {
         static uint32_t _lastTopic;
         static int8_t _lastLength;
         static void internalReceive();
+
+        static void initEvents();
+        static void internalReceiveEvent();
+        static uint8_t _eventCounter;
+        static String _lastReceivedEvents[MAX_RECEIVED_EVENTS];
 };

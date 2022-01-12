@@ -52,6 +52,10 @@ def __data_received(port_serial, data):
         port_serial.write(bytes("{\"c\":2,\"t\":" + str(data_type) + (",\"l\":" + str(length) if length >= 0 else "") + ",\"d\":" + str(data) + "}\n", "utf-8"))
 
 
+def __event_received(port_serial, event):
+    port_serial.write(bytes("{\"c\":3,\"e\":\"" + event + "\"}\n", "utf-8"))
+
+
 def handle_port(port_path):
     with opened_ports:
         opened_ports.append(port_path)
@@ -64,6 +68,8 @@ def handle_port(port_path):
 
         # creating an Intercom instance
         intercom = dvbcdr.intercom.Intercom()
+        intercom.on_events(lambda event: __event_received(port_serial, event))
+        intercom.wait_in_new_thread()
 
         while True:
             raw_data = port_serial.readline()
@@ -95,6 +101,8 @@ def handle_port(port_path):
                         elif data_type == 255:
                             intercom.subscribe_raw(crc_subject, lambda r: __data_received(port_serial, r))
                             port_serial.write(b"{\"c\":1}")
+                elif command == 3:
+                    intercom.publish_event(data["e"])
     except Exception as exception:
         print("Error on serial port:", port_path, exception)
 

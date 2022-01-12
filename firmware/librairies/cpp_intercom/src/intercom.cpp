@@ -10,6 +10,7 @@ uint8_t Intercom::_lastCommand;
 uint8_t Intercom::_lastType;
 uint32_t Intercom::_lastTopic;
 int8_t Intercom::_lastLength;
+uint8_t Intercom::_eventCounter = 0;
 
 void Intercom::init(String deviceId, unsigned long speed) {
     if(_initialized)
@@ -19,8 +20,15 @@ void Intercom::init(String deviceId, unsigned long speed) {
     Intercom::_deviceId = deviceId;
     Serial.begin(speed);
 
+    initEvents();
     sendDeviceId();
     waitForConnection();
+}
+
+void Intercom::initEvents() {
+    for(uint8_t i = 0; i < MAX_RECEIVED_EVENTS; i++) {
+        _lastReceivedEvents[i] = "";
+    }
 }
 
 void Intercom::sendDeviceId() {
@@ -34,23 +42,32 @@ void Intercom::internalReceive() {
 
     deserializeJson(_jsonDocument, Serial.readStringUntil('\n'));
 
-    _lastCommand = _jsonDocument["c"];
+    _lastCommand = _jsonDocument["c"].as<uint8_t>();
     if(_lastCommand == 0)
         sendDeviceId();
     
     if(_lastCommand == 2) {
-        _lastType = _jsonDocument["t"];
-        _lastTopic = _jsonDocument["s"]; // s for subject, t is already used by type
+        _lastType = _jsonDocument["t"].as<uint8_t>();
+        _lastTopic = _jsonDocument["s"].as<uint32_t>(); // s for subject, t is already used by type
 
         if(_jsonDocument.containsKey("l"))
-            _lastLength = _jsonDocument["l"];
+            _lastLength = _jsonDocument["l"].as<int8_t>();
         else
             _lastLength = -1;
     } else {
+        if(_lastCommand == 3)
+            internalReceiveEvent();
+
         _lastType = 255;
         _lastTopic = 0;
         _lastLength = -1;
     }
+}
+
+void Intercom::internalReceiveEvent() {
+    String eventName = _jsonDocument["e"].as<String>();
+    _lastReceivedEvents[_eventCounter] = eventName;
+    _eventCounter = (_eventCounter + 1) % MAX_RECEIVED_EVENTS;
 }
 
 void Intercom::waitForConnection() {
@@ -87,7 +104,7 @@ int Intercom::receiveInt() {
     while(true) {
         internalReceive();
         if(_lastCommand == 2 && _lastType == 0 && _lastLength == -1)
-            return _jsonDocument["v"];
+            return _jsonDocument["v"].as<int>();
     }
 }
 
@@ -95,7 +112,7 @@ String Intercom::receiveString() {
     while(true) {
         internalReceive();
         if(_lastCommand == 2 && _lastType == 1 && _lastLength == -1)
-            return _jsonDocument["v"];
+            return _jsonDocument["v"].as<String>();
     }
 }
 
@@ -103,7 +120,7 @@ float Intercom::receiveFloat() {
     while(true) {
         internalReceive();
         if(_lastCommand == 2 && _lastType == 2 && _lastLength == -1)
-            return _jsonDocument["v"];
+            return _jsonDocument["v"].as<float>();
     }
 }
 
@@ -111,7 +128,7 @@ double Intercom::receiveDouble() {
     while(true) {
         internalReceive();
         if(_lastCommand == 2 && _lastType == 2 && _lastLength == -1)
-            return _jsonDocument["v"];
+            return _jsonDocument["v"].as<double>();
     }
 }
 
@@ -157,7 +174,7 @@ int* Intercom::receiveIntArray() {
         if(_lastCommand == 2 && _lastType == 0 && _lastLength >= 0) {
             int* arr = new int[_lastLength];
             for(int i = 0; i < _lastLength; i++)
-                arr[i] = _jsonDocument["v"][i];
+                arr[i] = _jsonDocument["v"][i].as<int>();
             return arr;
         }
     }
@@ -181,7 +198,7 @@ float* Intercom::receiveFloatArray() {
         if(_lastCommand == 2 && _lastType == 2 && _lastLength >= 0) {
             float* arr = new float[_lastLength];
             for(int i = 0; i < _lastLength; i++)
-                arr[i] = _jsonDocument["v"][i];
+                arr[i] = _jsonDocument["v"][i].as<float>();
             return arr;
         }
     }
@@ -193,7 +210,7 @@ double* Intercom::receiveDoubleArray() {
         if(_lastCommand == 2 && _lastType == 2 && _lastLength >= 0) {
             double* arr = new double[_lastLength];
             for(int i = 0; i < _lastLength; i++)
-                arr[i] = _jsonDocument["v"][i];
+                arr[i] = _jsonDocument["v"][i].as<double>();
             return arr;
         }
     }
@@ -329,4 +346,161 @@ void Intercom::publish(String topic, double* ptr, int length) {
         Serial.print(ptr[i]);
     }
     Serial.println(F("]}"));
+}
+
+bool Intercom::instantReceiveInt(String* topic, int* value) {
+    if(Serial.available() > 0) {
+        internalReceive();
+        if(_lastCommand == 2 && _lastType == 0 && _lastLength < 0) {
+            *topic = _lastTopic;
+            *value = _jsonDocument["v"].as<int>();
+            return true;
+        }
+    }
+
+    return false;
+}
+
+bool Intercom::instantReceiveString(String* topic, String* value) {
+    if(Serial.available() > 0) {
+        internalReceive();
+        if(_lastCommand == 2 && _lastType == 1 && _lastLength < 0) {
+            *topic = _lastTopic;
+            *value = _jsonDocument["v"].as<String>();
+            return true;
+        }
+    }
+
+    return false;
+}
+
+bool Intercom::instantReceiveFloat(String* topic, float* value) {
+    if(Serial.available() > 0) {
+        internalReceive();
+        if(_lastCommand == 2 && _lastType == 2 && _lastLength < 0) {
+            *topic = _lastTopic;
+            *value = _jsonDocument["v"].as<float>();
+            return true;
+        }
+    }
+
+    return false;
+}
+
+bool Intercom::instantReceiveDouble(String* topic, double* value) {
+    if(Serial.available() > 0) {
+        internalReceive();
+        if(_lastCommand == 2 && _lastType == 2 && _lastLength < 0) {
+            *topic = _lastTopic;
+            *value = _jsonDocument["v"].as<double>();
+            return true;
+        }
+    }
+
+    return false;
+}
+
+bool Intercom::instantReceiveIntArray(String* topic, int* ptr, int* length) {
+    if(Serial.available() > 0) {
+        internalReceive();
+        if(_lastCommand == 2 && _lastType == 0 && _lastLength > 0) {
+            *topic = _lastTopic;
+            *length = _lastLength;
+            for(int i = 0; i < _lastLength; i++) {
+                ptr[i] = _jsonDocument["v"][i].as<int>();
+            }
+            return true;
+        }
+    }
+
+    return false;
+}
+
+bool Intercom::instantReceiveStringArray(String* topic, String* ptr, int* length) {
+    if(Serial.available() > 0) {
+        internalReceive();
+        if(_lastCommand == 2 && _lastType == 1 && _lastLength > 0) {
+            *topic = _lastTopic;
+            *length = _lastLength;
+            for(int i = 0; i < _lastLength; i++) {
+                ptr[i] = _jsonDocument["v"][i].as<String>();
+            }
+            return true;
+        }
+    }
+
+    return false;
+}
+
+bool Intercom::instantReceiveFloatArray(String* topic, float* ptr, int* length) {
+    if(Serial.available() > 0) {
+        internalReceive();
+        if(_lastCommand == 2 && _lastType == 2 && _lastLength > 0) {
+            *topic = _lastTopic;
+            *length = _lastLength;
+            for(int i = 0; i < _lastLength; i++) {
+                ptr[i] = _jsonDocument["v"][i].as<float>();
+            }
+            return true;
+        }
+    }
+
+    return false;
+}
+
+bool Intercom::instantReceiveDoubleArray(String* topic, double* ptr, int* length) {
+    if(Serial.available() > 0) {
+        internalReceive();
+        if(_lastCommand == 2 && _lastType == 2 && _lastLength > 0) {
+            *topic = _lastTopic;
+            *length = _lastLength;
+            for(int i = 0; i < _lastLength; i++) {
+                ptr[i] = _jsonDocument["v"][i].as<double>();
+            }
+            return true;
+        }
+    }
+
+    return false;
+}
+
+bool Intercom::instantHasReceivedEvent(String eventName) {
+    if(eventName == "") return false;
+
+    for(uint8_t i = _eventCounter; i < MAX_RECEIVED_EVENTS + _eventCounter; i++) {
+        if(_lastReceivedEvents[i % MAX_RECEIVED_EVENTS] == eventName) {
+            _lastReceivedEvents[i % MAX_RECEIVED_EVENTS] = "";
+            return true;
+        }
+    }
+
+    return false;
+}
+
+void Intercom::clearReceivedEvents() {
+    for(uint8_t i = 0; i < MAX_RECEIVED_EVENTS; i++) {
+        _lastReceivedEvents[i] = "";
+    }
+}
+
+void Intercom::publishEvent(String eventName) {
+    Serial.print(F("{\"c\":3,\"e\":\""));
+    Serial.print(eventName);
+    Serial.println(F("\"}"));
+}
+
+bool Intercom::hasReceivedEvent(String eventName) {
+    if(instantHasReceivedEvent(eventName))
+        return true;
+
+    while(Serial.available() > 0) {
+        internalReceive();
+        if(_lastCommand == 3) {
+            if(_lastReceivedEvents[_eventCounter] == eventName) {
+                return true;
+            }
+        }
+    }
+
+    return false;
 }
