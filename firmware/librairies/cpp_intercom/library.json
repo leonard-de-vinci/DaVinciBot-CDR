@@ -1,0 +1,11 @@
+{
+    "name": "cpp_intercom",
+    "version": "1.0.0",
+    "description": "Intercom client for embedded devices written in cpp for DaVinciBot and the French Robotics Cup",
+    "keywords": "intercom, cdr, davincibot",
+    "dependencies": {
+        "bblanchon/ArduinoJson": "^6.18.5"
+    },
+    "frameworks": "*",
+    "platforms": "*"
+  }

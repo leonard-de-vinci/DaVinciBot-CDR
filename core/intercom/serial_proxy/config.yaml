@@ -1,0 +1,2 @@
+ports_polling_interval: 0.1
+baudrate: 115200
