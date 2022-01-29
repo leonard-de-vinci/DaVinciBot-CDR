@@ -16,7 +16,7 @@ from .messages import ReceivedMessage
 
 MULTICAST_TTL = 2
 MULTICAST_PORT = 5007
-MULTICAST_BUFFSIZE = 1024
+MULTICAST_BUFFSIZE = 4096
 
 # always 4 bytes each
 PACKET_START = b"\0DVB"
@@ -286,13 +286,13 @@ class Intercom:
         self.start()
 
         topic_info = self.__get_topic_info(topic)
-        self.com_socket.sendto(PACKET_START + topic_info[0].to_bytes(3, "big") + bytes(json.dumps(message_data), "utf-8") + PACKET_END, (topic_info[1], MULTICAST_PORT))
+        self.com_socket.sendto(PACKET_START + topic_info[0].to_bytes(3, "big") + bytes(json.dumps(message_data, separators=(",", ":")), "utf-8") + PACKET_END, (topic_info[1], MULTICAST_PORT))
 
     def publish_raw(self, topic_code: int, message_data: Any = None) -> None:
         self.start()
 
         topic_ip = self.__topic_code_to_ip(topic_code)
-        self.com_socket.sendto(PACKET_START + topic_code.to_bytes(3, "big") + bytes(json.dumps(message_data), "utf-8") + PACKET_END, (topic_ip, MULTICAST_PORT))
+        self.com_socket.sendto(PACKET_START + topic_code.to_bytes(3, "big") + bytes(json.dumps(message_data, separators=(",", ":")), "utf-8") + PACKET_END, (topic_ip, MULTICAST_PORT))
 
     def publish_event(self, event_name: str) -> None:
         self.start()
