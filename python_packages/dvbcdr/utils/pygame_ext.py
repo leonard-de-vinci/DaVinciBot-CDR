@@ -1,4 +1,5 @@
 from abc import ABC
+from typing import Callable
 import pygame
 
 
@@ -252,3 +253,21 @@ class PygCdrSlider(PygCdrObject):
 
         pygame.draw.rect(self.object, self.line_color, pygame.Rect(self.handle_radius, (self.size[1] - self.line_size) // 2, self.size[0] - self.handle_radius * 2, self.line_size))
         pygame.draw.circle(self.object, self.handle_color, (self.__handle_pos(), self.size[1] // 2), self.handle_radius)
+
+
+class PygCdrSurface(PygCdrObject):
+    """
+    Represents a canvas on which graphics can be painted inside the `draw` callback.
+    """
+
+    def __init__(self, draw: Callable[[pygame.Surface], None], **kwargs):
+        super().__init__(**kwargs)
+
+        self.object = pygame.Surface(self.size, pygame.SRCALPHA)
+        self.draw = draw
+
+    def show(self, window):
+        if self.draw is not None:
+            self.draw(self.object)
+
+        super().show(window)
