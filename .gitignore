@@ -1,3 +1,5 @@
 __pycache__/
 .pio/
 .vscode/
+*.egg-info/
+python_packages/build/
