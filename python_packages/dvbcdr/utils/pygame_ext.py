@@ -170,11 +170,11 @@ class PygCdrSlider(PygCdrObject):
         self.onchange = onchange
         self.oninput = oninput
         self.original_onreleased = kwargs.get("onreleased", None)
-        kwargs["onreleased"] = lambda rel_pos: self.__on_released(rel_pos)
+        kwargs["onreleased"] = self.__onreleased
         self.original_onhover = kwargs.get("onhover", None)
-        kwargs["onhover"] = lambda rel_pos: self.__onhover(rel_pos)
+        kwargs["onhover"] = self.__onhover
         self.original_onclick = kwargs.get("onclick", None)
-        kwargs["onclick"] = lambda rel_pos: self.__onclick(rel_pos)
+        kwargs["onclick"] = self.__onclick
 
         super().__init__(**kwargs)
 
@@ -189,12 +189,9 @@ class PygCdrSlider(PygCdrObject):
 
         self.render_slider()
 
-    def __onreleased(self, relative_mouse_pos):
+    def __onreleased(self):
         if self.original_onreleased is not None:
-            if self.original_onreleased.__code__.co_argcount == 1:
-                self.original_onreleased(relative_mouse_pos)
-            else:
-                self.original_onreleased()
+            self.original_onreleased()
 
         if self.oninput.__code__.co_argcount == 1:
             self.oninput(self.current_value)
