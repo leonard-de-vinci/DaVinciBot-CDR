@@ -4,7 +4,8 @@ class BasicMotorController : public IMotorController {
     public:
         BasicMotorController(int leftSpeedPin, int leftDirAPin, int leftDirBPin, int rightSpeedPin, int rightDirAPin, int rightDirBPin);
         void stop() override;
-        void setSpeed(double left, double right, int ticksLeft, int ticksRight, elapsedMillis time) override;
+        void setSpeed(double left, double right) override;
+        void updateOutput(int ticksLeft = 0, int ticksRight = 0, elapsedMillis time = 0) override;
 
     private:
         int leftSpeedPin;

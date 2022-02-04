@@ -1,10 +1,16 @@
 #ifndef CONSTANTS_H
 #define CONSTANTS_H
 
-#define interruptPin_left 8
-#define interruptPin_right 4
-#define dirPin_left 9
-#define dirPin_right 7
+#define posInterruptPin_left 8
+#define posInterruptPin_right 4
+#define posDirPin_left 9
+#define posDirPin_right 7
+
+#define USE_SPEED_ENCODERS false
+#define speedInterruptPin_left 0
+#define speedInterruptPin_right 0
+#define speedDirPin_left 0
+#define speedDirPin_right 0
 
 #define wheel_ticks_count 1024
 
@@ -23,9 +29,12 @@
 
 #define ARRIVAL_THRESHOLD 8
 #define ROTATION_THRESOLD_DEG 5
+#define PT_FWD_THRESHOLD_RAD PI/4
 
 #define MOTORS_V 2
 #define MOTORS_K 1
 
-#define ROTATE_SPEED
+#define ROTATE_SPEED 50
+
+#define ROBOT_ID -1
 #endif

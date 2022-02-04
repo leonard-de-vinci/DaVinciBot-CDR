@@ -27,15 +27,12 @@ void BasicMotorController::stop() {
     digitalWrite(rightDirBPin, LOW);
 }
 
-void BasicMotorController::setSpeed(double left, double right, int ticksLeft, int ticksRight, elapsedMillis time) {
-    targetTicksLeftPerSec = left * wheel_ticks_count;
-    targetTicksRightPerSec = right * wheel_ticks_count;
-
+void BasicMotorController::updateOutput(int ticksLeft, int ticksRight, elapsedMillis time) {
     int oldErrorLeft = errorLeft;
     int oldErrorRight = errorRight;
 
-    errorLeft = targetTicksLeftPerSec - ticksLeft;
-    errorRight = targetTicksRightPerSec - ticksRight;
+    errorLeft = targetTicksLeftPerSec - (ticksLeft * 1000 / time);
+    errorRight = targetTicksRightPerSec - (ticksRight * 1000 / time);
 
     errorIntLeft += errorLeft;
     errorIntRight += errorRight;
@@ -85,4 +82,9 @@ void BasicMotorController::setSpeed(double left, double right, int ticksLeft, in
         cmdRight = 1023;
 
     analogWrite(rightSpeedPin, cmdRight);
+}
+
+void BasicMotorController::setSpeed(double left, double right) {
+    targetTicksLeftPerSec = left * wheel_ticks_count;
+    targetTicksRightPerSec = right * wheel_ticks_count;
 }
