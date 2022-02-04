@@ -23,10 +23,9 @@ def transform_lidar_distances(distances: List[int], start_angle: float, angle_di
     angle = start_angle
     relative_points = []
     for val in distances:
-        if val < 0.01:
-            continue
+        if val > 0.01:
+            relative_points.append((int(cos(radians(angle)) * val * 10), int(sin(radians(angle)) * val * 10)))
 
-        relative_points.append((int(cos(radians(angle)) * val * 100), int(sin(radians(angle)) * val * 100)))
         angle = (angle - angle_div) % 360
 
     return relative_points
@@ -61,13 +60,13 @@ def clusters_to_objects(clusters: List[List[Point]]) -> List[LidarObject]:
     return [LidarObject(x) for x in clusters]
 
 
-def filter_objects(objects: List[LidarObject], distance_thresold: int = 30) -> List[LidarObject]:
+def filter_objects(objects: List[LidarObject], distance_thresold: int = 300) -> List[LidarObject]:
     """
     Filters a list of `LidarObject`, keeping only close objects.
 
     Args:
         objects: A list of `LidarObject`.
-        distance_thresold: The maximum distance to consider an object close.
+        distance_thresold: The maximum distance to consider an object close in mm.
 
     Returns:
         A list of close objects based on `distance_thresold`.
@@ -86,7 +85,7 @@ def distances_to_near_objects(distances: List[int], start_angle: float, angle_di
         start_angle: The angle of the first distance line from the LiDAR.
         angle_div: The angle between each distance line of the LiDAR.
         eps: Algorithm parameter passed to the DBSCAN cluster method.
-        distance_thresold: Maximum distance for an object to be considered close.
+        distance_thresold: Maximum distance for an object to be considered close in mm.
 
     Returns:
         A list of close objects measured with the LiDAR.

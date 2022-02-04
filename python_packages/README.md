@@ -64,6 +64,11 @@ def round_significant_decimals(number: Union[float, int], significant_decimals: 
 ```
 
 ### `thread_safe.py`
+Working with threads in Python can sometimes be difficult, especially when you want to share data between threads.
+Imagine a thread is reading a list while another thread is appending to it: it might cause data inconsistency.
+
+These classes extends the base Python classes but provide a thread safe version of the methods.
+Use theses classes like any other Python list or dictionary.
 ```python
 class ThreadSafeDict(dict)
 # a thread safe dictionary (same features a normal dict but with thread safety)
@@ -74,6 +79,7 @@ class ThreadSafeList(list)
 class DataEvent
 # replacement for the default 'Event' class that can carry data
 ```
+Internally, these classes use a lock that wait for other threads to finish their use of the instance before continuing.
 
 ### `time.py`
 ```python	

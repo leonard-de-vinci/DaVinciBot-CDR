@@ -43,7 +43,7 @@ class PygCdrObject(ABC):
     def clicked(self, relative_mouse_pos):
         if self.clickable():
             self.is_clicked = True
-            if self.onclick.__code__.co_argcount == 1:
+            if self.onclick.__code__.co_argcount >= 1:
                 self.onclick(relative_mouse_pos)
             else:
                 self.onclick()
@@ -106,7 +106,7 @@ class PygCdrScene():
                     element.onenter()
                 element.is_hovered = True
                 if element.onhover is not None:
-                    if element.onhover.__code__.co_argcount == 1:
+                    if element.onhover.__code__.co_argcount >= 1:
                         element.onhover(relative_mouse_pos)
                     else:
                         element.onhover()
@@ -150,7 +150,7 @@ class PygCdrText(PygCdrObject):
         else:
             self.size = text_size
 
-        self.object = pygame.Surface(self.size)
+        self.object = pygame.Surface(self.size, pygame.SRCALPHA)
         self.object.fill(self.bg_color)
         self.object.blit(self.text_obj, (tx, ty))
 
@@ -193,7 +193,7 @@ class PygCdrSlider(PygCdrObject):
         if self.original_onreleased is not None:
             self.original_onreleased()
 
-        if self.oninput.__code__.co_argcount == 1:
+        if self.oninput.__code__.co_argcount >= 1:
             self.oninput(self.current_value)
         else:
             self.oninput()
@@ -208,7 +208,7 @@ class PygCdrSlider(PygCdrObject):
                 self.current_value = new_value
                 self.render_slider()
                 if self.onchange is not None:
-                    if self.onchange.__code__.co_argcount == 1:
+                    if self.onchange.__code__.co_argcount >= 1:
                         self.onchange(self.current_value)
                     else:
                         self.onchange()
@@ -216,7 +216,7 @@ class PygCdrSlider(PygCdrObject):
             self.render_slider()
 
         if self.original_onhover is not None:
-            if self.original_onhover.__code__.co_argcount == 1:
+            if self.original_onhover.__code__.co_argcount >= 1:
                 self.original_onhover(relative_mouse_pos)
             else:
                 self.original_onhover()
@@ -225,7 +225,7 @@ class PygCdrSlider(PygCdrObject):
         self.click_dx = relative_mouse_pos[0] - self.__handle_pos()
 
         if self.original_onclick is not None:
-            if self.original_onclick.__code__.co_argcount == 1:
+            if self.original_onclick.__code__.co_argcount >= 1:
                 self.original_onclick(relative_mouse_pos)
             else:
                 self.original_onclick()
@@ -268,3 +268,52 @@ class PygCdrSurface(PygCdrObject):
             self.draw(self.object)
 
         super().show(window)
+
+
+class PygCdrCheckbox(PygCdrObject):
+    def __init__(self, text, checked=False, font_name="Arial", font_size=15, fg_color=(0, 0, 0), bg_color=(255, 255, 255), onchange=None, **kwargs):
+        self.text = text
+        self.font_name = font_name
+        self.font_size = font_size
+        self.checked = checked
+        self.fg_color = fg_color
+        self.bg_color = bg_color
+
+        self.onchange = onchange
+        self.original_onclick = kwargs.get("onclick", None)
+        kwargs["onclick"] = self.__onclick
+
+        super().__init__(**kwargs)
+        self.render_checkbox()
+
+    def render_checkbox(self):
+        self.object = pygame.Surface(self.size)
+        self.object.fill(self.bg_color)
+
+        box_size = self.size[1]
+        pygame.draw.rect(self.object, self.fg_color, (0, 0, box_size, box_size))
+
+        box_border = int(box_size * 0.15)
+        pygame.draw.rect(self.object, self.bg_color, (box_border, box_border, box_size - box_border * 2, box_size - box_border * 2))
+
+        if self.checked:
+            inside_size = int(box_size * 0.6)
+            pygame.draw.rect(self.object, self.fg_color, (box_border * 2, box_border * 2, inside_size, inside_size))
+
+        PygCdrText(self.text, self.font_size, (0, 0, 0, 0), self.fg_color, self.font_name, pos=(int(box_size * 1.3), 0)).show(self.object)
+
+    def __onclick(self, relative_mouse_pos):
+        self.checked = not self.checked
+        self.render_checkbox()
+
+        if self.onchange is not None:
+            self.onchange(self.checked)
+
+        if self.original_onclick is not None:
+            if self.original_onclick.__code__.co_argcount >= 1:
+                self.original_onclick(relative_mouse_pos)
+            else:
+                self.original_onclick()
+
+    def show(self, screen):
+        super().show(screen)
