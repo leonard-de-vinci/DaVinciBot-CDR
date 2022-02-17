@@ -4,13 +4,17 @@
 
 bool Intercom::_initialized = false;
 String Intercom::_deviceId = "";
+uint8_t Intercom::_lastCommand = 0;
 
-StaticJsonDocument<256> Intercom::_jsonDocument;
-uint8_t Intercom::_lastCommand;
-uint8_t Intercom::_lastType;
-uint32_t Intercom::_lastTopic;
-int8_t Intercom::_lastLength;
+StaticJsonDocument<1024> Intercom::_lastJsonDocument;
+uint8_t Intercom::_messageCounter = 0;
+ReceivedMessage Intercom::_receivedMessages[MAX_RECEIVED_MESSAGES];
+
 uint8_t Intercom::_eventCounter = 0;
+String Intercom::_receivedEvents[MAX_RECEIVED_EVENTS];
+
+uint8_t Intercom::_servoCounter = 0;
+RegisteredServo _servos[MAX_REGISTERED_SERVO];
 
 void Intercom::init(String deviceId, unsigned long speed) {
     if(_initialized)
@@ -27,7 +31,7 @@ void Intercom::init(String deviceId, unsigned long speed) {
 
 void Intercom::initEvents() {
     for(uint8_t i = 0; i < MAX_RECEIVED_EVENTS; i++) {
-        _lastReceivedEvents[i] = "";
+        _receivedEvents[i] = "";
     }
 }
 
@@ -37,43 +41,100 @@ void Intercom::sendDeviceId() {
     Serial.println(F("\"}"));
 }
 
-void Intercom::internalReceive() {
-    while(Serial.available() == 0);
+bool Intercom::internalReceive(uint8_t max = MAX_RECEIVED_MESSAGES) {
+    deserializeJson(_lastJsonDocument, Serial.readStringUntil('\n'));
 
-    deserializeJson(_jsonDocument, Serial.readStringUntil('\n'));
-
-    _lastCommand = _jsonDocument["c"].as<uint8_t>();
-    if(_lastCommand == 0)
+    _lastCommand = _lastJsonDocument["c"];
+    if(_lastCommand == 0) {
         sendDeviceId();
-    
-    if(_lastCommand == 2) {
-        _lastType = _jsonDocument["t"].as<uint8_t>();
-        _lastTopic = _jsonDocument["s"].as<uint32_t>(); // s for subject, t is already used by type
+    } else if(_lastCommand == 2) {
+        uint8_t type = _lastJsonDocument["t"].as<uint8_t>();
+        uint8_t topic = _lastJsonDocument["s"].as<uint32_t>(); // s for subject
 
-        if(_jsonDocument.containsKey("l"))
-            _lastLength = _jsonDocument["l"].as<int8_t>();
-        else
-            _lastLength = -1;
-    } else {
-        if(_lastCommand == 3)
-            internalReceiveEvent();
+        int8_t length = -1;
+        if(_lastJsonDocument.containsKey("l"))
+            length = _lastJsonDocument["l"].as<int8_t>();
 
-        _lastType = 255;
-        _lastTopic = 0;
-        _lastLength = -1;
+        uint8_t pos = _messageCounter;
+        for(uint8_t i = 0; i < MAX_RECEIVED_MESSAGES; i++) {
+            if(!_receivedMessages[i].occupied()) break;
+            pos = (pos + 1) % MAX_RECEIVED_MESSAGES;
+        }
+
+        _messageCounter = pos;
+
+        _receivedMessages[pos].topic = topic;
+        _receivedMessages[pos].type = type;
+        _receivedMessages[pos].length = length;
+
+        bool isArray = length >= 0;
+
+        if(_receivedMessages[pos].occupied())
+            _receivedMessages[pos].release(); // IMPORTANT!
+
+        if(type == 0) {
+            // int
+            if(isArray) {
+                int* ptr = (int*)_receivedMessages[pos].alloc(sizeof(int) * length);
+                for(int i = 0; i < length; i++) {
+                    ptr[i] = _lastJsonDocument["v"][i].as<int>();
+                }
+            } else {
+                int* ptr = (int*)_receivedMessages[pos].alloc(sizeof(int));
+                *ptr = _lastJsonDocument["v"].as<int>();
+            }
+        } else if(type == 1) {
+            // string
+            if(isArray) {
+                String* ptr = (String*)_receivedMessages[pos].alloc(sizeof(String) * length);
+                for(int i = 0; i < length; i++) {
+                    ptr[i] = _lastJsonDocument["v"][i].as<String>();
+                }
+            } else {
+                String* ptr = (String*)_receivedMessages[pos].alloc(sizeof(String));
+                *ptr = _lastJsonDocument["v"].as<String>();
+            }
+        } else if(type == 2) {
+            // float
+            if(isArray) {
+                float* ptr = (float*)_receivedMessages[pos].alloc(sizeof(float) * length);
+                for(int i = 0; i < length; i++) {
+                    ptr[i] = _lastJsonDocument["v"][i].as<float>();
+                }
+            } else {
+                float* ptr = (float*)_receivedMessages[pos].alloc(sizeof(float));
+                *ptr = _lastJsonDocument["v"].as<float>();
+            }
+        }
+
+        return true; // true if a real message was received
+    } else if(_lastCommand == 3) {
+        String eventName = _lastJsonDocument["e"].as<String>();
+        _receivedEvents[_eventCounter] = eventName;
+        _eventCounter = (_eventCounter + 1) % MAX_RECEIVED_EVENTS;
     }
+    
+    return false;
 }
 
-void Intercom::internalReceiveEvent() {
-    String eventName = _jsonDocument["e"].as<String>();
-    _lastReceivedEvents[_eventCounter] = eventName;
-    _eventCounter = (_eventCounter + 1) % MAX_RECEIVED_EVENTS;
+void Intercom::tick() {
+    for(uint8_t i = 0; Serial.available() > 0 && i < MAX_RECEIVED_MESSAGES; i++) {
+        internalReceive();
+    }
+
+    int angle = 0;
+    for(uint8_t i = 0; i < _servoCounter; i++) {
+        String servoId = _servos[i].servoId;
+        if(instantReceiveInt("api_request_servo" + servoId, &angle)) {
+            _servos[i].servo.write(angle);
+        }
+    }
 }
 
 void Intercom::waitForConnection() {
     while(true) {
-        internalReceive();
-        if(_lastCommand == 1)
+        internalReceive(1);
+        if(_lastCommand == 1 || _receivedMessages[_messageCounter].occupied())
             break;
     }
 }
@@ -81,7 +142,7 @@ void Intercom::waitForConnection() {
 bool Intercom::waitForPing(unsigned int timeoutMs) {
     unsigned long start = millis();
     while(true) {
-        internalReceive();
+        internalReceive(1);
         if(_lastCommand == 1)
             return true;
         if(millis() - start > timeoutMs)
@@ -95,160 +156,8 @@ void Intercom::subscribe(String topic) {
         Serial.print(crc24(topic));
         Serial.println(F("}"));
 
-        if(waitForPing(500))
+        if(waitForPing(250))
             break;
-    }
-}
-
-int Intercom::receiveInt() {
-    while(true) {
-        internalReceive();
-        if(_lastCommand == 2 && _lastType == 0 && _lastLength == -1)
-            return _jsonDocument["v"].as<int>();
-    }
-}
-
-String Intercom::receiveString() {
-    while(true) {
-        internalReceive();
-        if(_lastCommand == 2 && _lastType == 1 && _lastLength == -1)
-            return _jsonDocument["v"].as<String>();
-    }
-}
-
-float Intercom::receiveFloat() {
-    while(true) {
-        internalReceive();
-        if(_lastCommand == 2 && _lastType == 2 && _lastLength == -1)
-            return _jsonDocument["v"].as<float>();
-    }
-}
-
-double Intercom::receiveDouble() {
-    while(true) {
-        internalReceive();
-        if(_lastCommand == 2 && _lastType == 2 && _lastLength == -1)
-            return _jsonDocument["v"].as<double>();
-    }
-}
-
-int Intercom::receiveInt(String topic) {
-    uint32_t crcTopic = crc24(topic);
-    while(true) {
-        int val = receiveInt();
-        if(_lastTopic == crcTopic)
-            return val;
-    }
-}
-
-String Intercom::receiveString(String topic) {
-    uint32_t crcTopic = crc24(topic);
-    while(true) {
-        String val = receiveString();
-        if(_lastTopic == crcTopic)
-            return val;
-    }
-}
-
-float Intercom::receiveFloat(String topic) {
-    uint32_t crcTopic = crc24(topic);
-    while(true) {
-        float val = receiveFloat();
-        if(_lastTopic == crcTopic)
-            return val;
-    }
-}
-
-double Intercom::receiveDouble(String topic) {
-    uint32_t crcTopic = crc24(topic);
-    while(true) {
-        double val = receiveDouble();
-        if(_lastTopic == crcTopic)
-            return val;
-    }
-}
-
-int* Intercom::receiveIntArray() {
-    while(true) {
-        internalReceive();
-        if(_lastCommand == 2 && _lastType == 0 && _lastLength >= 0) {
-            int* arr = new int[_lastLength];
-            for(int i = 0; i < _lastLength; i++)
-                arr[i] = _jsonDocument["v"][i].as<int>();
-            return arr;
-        }
-    }
-}
-
-String* Intercom::receiveStringArray() {
-    while(true) {
-        internalReceive();
-        if(_lastCommand == 2 && _lastType == 1 && _lastLength >= 0) {
-            String* arr = new String[_lastLength];
-            for(int i = 0; i < _lastLength; i++)
-                arr[i] = _jsonDocument["v"][i].as<String>();
-            return arr;
-        }
-    }
-}
-
-float* Intercom::receiveFloatArray() {
-    while(true) {
-        internalReceive();
-        if(_lastCommand == 2 && _lastType == 2 && _lastLength >= 0) {
-            float* arr = new float[_lastLength];
-            for(int i = 0; i < _lastLength; i++)
-                arr[i] = _jsonDocument["v"][i].as<float>();
-            return arr;
-        }
-    }
-}
-
-double* Intercom::receiveDoubleArray() {
-    while(true) {
-        internalReceive();
-        if(_lastCommand == 2 && _lastType == 2 && _lastLength >= 0) {
-            double* arr = new double[_lastLength];
-            for(int i = 0; i < _lastLength; i++)
-                arr[i] = _jsonDocument["v"][i].as<double>();
-            return arr;
-        }
-    }
-}
-
-int* Intercom::receiveIntArray(String topic) {
-    uint32_t crcTopic = crc24(topic);
-    while(true) {
-        int* arr = receiveIntArray();
-        if(_lastTopic == crcTopic)
-            return arr;
-    }
-}
-
-String* Intercom::receiveStringArray(String topic) {
-    uint32_t crcTopic = crc24(topic);
-    while(true) {
-        String* arr = receiveStringArray();
-        if(_lastTopic == crcTopic)
-            return arr;
-    }
-}
-
-float* Intercom::receiveFloatArray(String topic) {
-    uint32_t crcTopic = crc24(topic);
-    while(true) {
-        float* arr = receiveFloatArray();
-        if(_lastTopic == crcTopic)
-            return arr;
-    }
-}
-
-double* Intercom::receiveDoubleArray(String topic) {
-    uint32_t crcTopic = crc24(topic);
-    while(true) {
-        double* arr = receiveDoubleArray();
-        if(_lastTopic == crcTopic)
-            return arr;
     }
 }
 
@@ -269,15 +178,6 @@ void Intercom::publish(String topic, String value) {
 }
 
 void Intercom::publish(String topic, float value) {
-    Serial.print(F("{\"c\":2,\"t\":2,\"s\":"));
-    Serial.print(crc24(topic));
-    Serial.print(F(",\"v\":"));
-    Serial.print(value);
-    Serial.println(F("}"));
-}
-
-void Intercom::publish(String topic, double value) {
-    // double has the same datatype as float
     Serial.print(F("{\"c\":2,\"t\":2,\"s\":"));
     Serial.print(crc24(topic));
     Serial.print(F(",\"v\":"));
@@ -332,28 +232,16 @@ void Intercom::publish(String topic, float* ptr, int length) {
     Serial.println(F("]}"));
 }
 
-void Intercom::publish(String topic, double* ptr, int length) {
-    // double has the same datatype as float
-    Serial.print(F("{\"c\":2,\"t\":2,\"l\":"));
-    Serial.print(length);
-    Serial.print(F(",\"s\":"));
-    Serial.print(crc24(topic));
-    Serial.print(F(",\"v\":"));
-    Serial.print(F("["));
-    for(int i = 0; i < length; i++) {
-        if(i > 0)
-            Serial.print(F(","));
-        Serial.print(ptr[i]);
-    }
-    Serial.println(F("]}"));
-}
+bool Intercom::instantReceiveInt(String topic, int* value) {
+    uint32_t crc = crc24(topic);
 
-bool Intercom::instantReceiveInt(String* topic, int* value) {
-    if(Serial.available() > 0) {
-        internalReceive();
-        if(_lastCommand == 2 && _lastType == 0 && _lastLength < 0) {
-            *topic = _lastTopic;
-            *value = _jsonDocument["v"].as<int>();
+    for(uint8_t i = 0; i < MAX_RECEIVED_MESSAGES; i++) {
+        uint8_t pos = (_messageCounter + i) % MAX_RECEIVED_MESSAGES;
+        ReceivedMessage message = _receivedMessages[pos];
+
+        if(message.occupied() && message.topic == crc) {
+            *value = *(int*)message.ptr;
+            message.release();
             return true;
         }
     }
@@ -361,12 +249,16 @@ bool Intercom::instantReceiveInt(String* topic, int* value) {
     return false;
 }
 
-bool Intercom::instantReceiveString(String* topic, String* value) {
-    if(Serial.available() > 0) {
-        internalReceive();
-        if(_lastCommand == 2 && _lastType == 1 && _lastLength < 0) {
-            *topic = _lastTopic;
-            *value = _jsonDocument["v"].as<String>();
+bool Intercom::instantReceiveString(String topic, String* value) {
+    uint32_t crc = crc24(topic);
+
+    for(uint8_t i = 0; i < MAX_RECEIVED_MESSAGES; i++) {
+        uint8_t pos = (_messageCounter + i) % MAX_RECEIVED_MESSAGES;
+        ReceivedMessage message = _receivedMessages[pos];
+
+        if(message.occupied() && message.topic == crc) {
+            *value = *(String*)message.ptr;
+            message.release();
             return true;
         }
     }
@@ -374,12 +266,16 @@ bool Intercom::instantReceiveString(String* topic, String* value) {
     return false;
 }
 
-bool Intercom::instantReceiveFloat(String* topic, float* value) {
-    if(Serial.available() > 0) {
-        internalReceive();
-        if(_lastCommand == 2 && _lastType == 2 && _lastLength < 0) {
-            *topic = _lastTopic;
-            *value = _jsonDocument["v"].as<float>();
+bool Intercom::instantReceiveFloat(String topic, float* value) {
+    uint32_t crc = crc24(topic);
+
+    for(uint8_t i = 0; i < MAX_RECEIVED_MESSAGES; i++) {
+        uint8_t pos = (_messageCounter + i) % MAX_RECEIVED_MESSAGES;
+        ReceivedMessage message = _receivedMessages[pos];
+
+        if(message.occupied() && message.topic == crc) {
+            *value = *(float*)message.ptr;
+            message.release();
             return true;
         }
     }
@@ -387,12 +283,17 @@ bool Intercom::instantReceiveFloat(String* topic, float* value) {
     return false;
 }
 
-bool Intercom::instantReceiveDouble(String* topic, double* value) {
-    if(Serial.available() > 0) {
-        internalReceive();
-        if(_lastCommand == 2 && _lastType == 2 && _lastLength < 0) {
-            *topic = _lastTopic;
-            *value = _jsonDocument["v"].as<double>();
+bool Intercom::instantReceiveIntArray(String topic, int* ptr, int* length) {
+    uint32_t crc = crc24(topic);
+
+    for(uint8_t i = 0; i < MAX_RECEIVED_MESSAGES; i++) {
+        uint8_t pos = (_messageCounter + i) % MAX_RECEIVED_MESSAGES;
+        ReceivedMessage message = _receivedMessages[pos];
+
+        if(message.occupied() && message.topic == crc) {
+            *length = message.length;
+            memcpy(ptr, message.ptr, message.length * sizeof(int));
+            message.release();
             return true;
         }
     }
@@ -400,15 +301,17 @@ bool Intercom::instantReceiveDouble(String* topic, double* value) {
     return false;
 }
 
-bool Intercom::instantReceiveIntArray(String* topic, int* ptr, int* length) {
-    if(Serial.available() > 0) {
-        internalReceive();
-        if(_lastCommand == 2 && _lastType == 0 && _lastLength > 0) {
-            *topic = _lastTopic;
-            *length = _lastLength;
-            for(int i = 0; i < _lastLength; i++) {
-                ptr[i] = _jsonDocument["v"][i].as<int>();
-            }
+bool Intercom::instantReceiveStringArray(String topic, String* ptr, int* length) {
+    uint32_t crc = crc24(topic);
+
+    for(uint8_t i = 0; i < MAX_RECEIVED_MESSAGES; i++) {
+        uint8_t pos = (_messageCounter + i) % MAX_RECEIVED_MESSAGES;
+        ReceivedMessage message = _receivedMessages[pos];
+
+        if(message.occupied() && message.topic == crc) {
+            *length = message.length;
+            memcpy(ptr, message.ptr, message.length * sizeof(String));
+            message.release();
             return true;
         }
     }
@@ -416,47 +319,17 @@ bool Intercom::instantReceiveIntArray(String* topic, int* ptr, int* length) {
     return false;
 }
 
-bool Intercom::instantReceiveStringArray(String* topic, String* ptr, int* length) {
-    if(Serial.available() > 0) {
-        internalReceive();
-        if(_lastCommand == 2 && _lastType == 1 && _lastLength > 0) {
-            *topic = _lastTopic;
-            *length = _lastLength;
-            for(int i = 0; i < _lastLength; i++) {
-                ptr[i] = _jsonDocument["v"][i].as<String>();
-            }
-            return true;
-        }
-    }
+bool Intercom::instantReceiveFloatArray(String topic, float* ptr, int* length) {
+    uint32_t crc = crc24(topic);
 
-    return false;
-}
+    for(uint8_t i = 0; i < MAX_RECEIVED_MESSAGES; i++) {
+        uint8_t pos = (_messageCounter + i) % MAX_RECEIVED_MESSAGES;
+        ReceivedMessage message = _receivedMessages[pos];
 
-bool Intercom::instantReceiveFloatArray(String* topic, float* ptr, int* length) {
-    if(Serial.available() > 0) {
-        internalReceive();
-        if(_lastCommand == 2 && _lastType == 2 && _lastLength > 0) {
-            *topic = _lastTopic;
-            *length = _lastLength;
-            for(int i = 0; i < _lastLength; i++) {
-                ptr[i] = _jsonDocument["v"][i].as<float>();
-            }
-            return true;
-        }
-    }
-
-    return false;
-}
-
-bool Intercom::instantReceiveDoubleArray(String* topic, double* ptr, int* length) {
-    if(Serial.available() > 0) {
-        internalReceive();
-        if(_lastCommand == 2 && _lastType == 2 && _lastLength > 0) {
-            *topic = _lastTopic;
-            *length = _lastLength;
-            for(int i = 0; i < _lastLength; i++) {
-                ptr[i] = _jsonDocument["v"][i].as<double>();
-            }
+        if(message.occupied() && message.topic == crc) {
+            *length = message.length;
+            memcpy(ptr, message.ptr, message.length * sizeof(float));
+            message.release();
             return true;
         }
     }
@@ -468,8 +341,8 @@ bool Intercom::instantHasReceivedEvent(String eventName) {
     if(eventName == "") return false;
 
     for(uint8_t i = _eventCounter; i < MAX_RECEIVED_EVENTS + _eventCounter; i++) {
-        if(_lastReceivedEvents[i % MAX_RECEIVED_EVENTS] == eventName) {
-            _lastReceivedEvents[i % MAX_RECEIVED_EVENTS] = "";
+        if(_receivedEvents[i % MAX_RECEIVED_EVENTS] == eventName) {
+            _receivedEvents[i % MAX_RECEIVED_EVENTS] = "";
             return true;
         }
     }
@@ -479,7 +352,7 @@ bool Intercom::instantHasReceivedEvent(String eventName) {
 
 void Intercom::clearReceivedEvents() {
     for(uint8_t i = 0; i < MAX_RECEIVED_EVENTS; i++) {
-        _lastReceivedEvents[i] = "";
+        _receivedEvents[i] = "";
     }
 }
 
@@ -489,18 +362,33 @@ void Intercom::publishEvent(String eventName) {
     Serial.println(F("\"}"));
 }
 
-bool Intercom::hasReceivedEvent(String eventName) {
-    if(instantHasReceivedEvent(eventName))
-        return true;
+void Intercom::registerServo(String servoId, int pin) {
+    if(_servoCounter < MAX_REGISTERED_SERVO) {
+        subscribe("api_request_servo" + servoId);
 
-    while(Serial.available() > 0) {
-        internalReceive();
-        if(_lastCommand == 3) {
-            if(_lastReceivedEvents[_eventCounter] == eventName) {
-                return true;
-            }
-        }
+        _servos[_servoCounter].servoId = servoId;
+        _servos[_servoCounter].servo.attach(pin);
+        _servoCounter++;
     }
+}
 
-    return false;
+void Intercom::registerSensor(String sensorId) {
+    subscribe("api_request_sensor" + sensorId);
+}
+
+int Intercom::isSensorRequested(String sensorId) {
+    int readId = -1;
+    instantReceiveInt("api_request_sensor" + sensorId, &readId);
+    
+    return readId;
+}
+
+void Intercom::sendSensorValue(String sensorId, int readId, int value) {
+    int values[] = {readId, value};
+    publish("api_response_sensor" + sensorId, values, 2);
+}
+
+void Intercom::sendSensorValue(String sensorId, int readId, float value) {
+    float values[] = {(float)readId, value};
+    publish("api_response_sensor" + sensorId, values, 2);
 }

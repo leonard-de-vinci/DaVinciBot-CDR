@@ -111,7 +111,7 @@ void setup() {
         attachInterrupt(digitalPinToInterrupt(speedInterruptPin_right), speedInterruptionRight, CHANGE);
     }
 
-    NVIC_SET_PRIORITY(IRQ_PORTA, 0);
+    // NVIC_SET_PRIORITY(IRQ_PORTA, 0);
 
     pinMode(motorPwm_left, OUTPUT);
     pinMode(motorPwm_right, OUTPUT);
@@ -139,8 +139,8 @@ int requested_position[3];
 int* req_x = &requested_position[0];
 int* req_y = &requested_position[1];
 int* req_teta = &requested_position[2];
+bool arrived_sent = false;
 
-String last_received_topic;
 int* last_received_position;
 int last_received_length;
 
@@ -161,6 +161,15 @@ double anglePi(double angle) {
 }
 
 void loop() {
+    if(Intercom::instantHasReceivedEvent("stop")) {
+        arrived_sent = true;
+        motorController->stop();
+
+        requested_position[0] = transform_approx[1];
+        requested_position[1] = transform_approx[2];
+        requested_position[2] = transform_approx[3];
+    }
+
     if(shouldRunLogic) {
         shouldRunLogic = false;
         // run logic at a specific rate per second
@@ -168,26 +177,30 @@ void loop() {
         updatePosition(constDist * posTicksLeft, constDist * posTicksRight);
         Intercom::publish("robot_position", transform_approx, 4);
 
-        if(Intercom::instantReceiveIntArray(&last_received_topic, last_received_position, &last_received_length)) {
+        if(Intercom::instantReceiveIntArray("move_robot", last_received_position, &last_received_length)) {
             // element 0 (first position) is the robot id, so position starts at element 1
             if(last_received_length == 4 && last_received_position[0] == ROBOT_ID) {
-                if(last_received_topic == "move_robot") {
-                    requested_position[0] = last_received_position[1];
-                    requested_position[1] = last_received_position[2];
-                    requested_position[2] = last_received_position[3]; // send a negative rotation if not required
-                } else if(last_received_topic == "force_robot_position") {
-                    *robot_x = last_received_position[1];
-                    *robot_y = last_received_position[2];
-                    *robot_teta = last_received_position[3] * DEG_TO_RAD;
-                }
+                requested_position[0] = last_received_position[1];
+                requested_position[1] = last_received_position[2];
+                requested_position[2] = last_received_position[3]; // send a negative rotation if not required
+
+                arrived_sent = false;
             }
         }
 
-        if(Intercom::instantReceiveInt(&last_received_topic, &last_received_length)) {
-            // last_received_length will contain the received int value, it's not really a length...
-            if(last_received_topic == "rotate_robot") {
-                requested_position[2] = last_received_length;
+        if(Intercom::instantReceiveIntArray("force_robot_position", last_received_position, &last_received_length)) {
+            // element 0 (first position) is the robot id, so position starts at element 1
+            if(last_received_length == 4 && last_received_position[0] == ROBOT_ID) {
+                *robot_x = last_received_position[1];
+                *robot_y = last_received_position[2];
+                *robot_teta = last_received_position[3] * DEG_TO_RAD;
             }
+        }
+
+        if(Intercom::instantReceiveInt("rotate_robot", &last_received_length)) {
+            // last_received_length will contain the received int value, it's not really a length...
+            requested_position[2] = last_received_length;
+            arrived_sent = false;
         }
 
         int dist = distance(transform_approx[1], transform_approx[2], requested_position[0], requested_position[1]);
@@ -220,6 +233,11 @@ void loop() {
             } else {
                 // we don't want a specific orientation so we stop
                 motorController->setSpeed(0, 0);
+
+                if(!arrived_sent) {
+                    arrived_sent = true;
+                    Intercom::publish("robot_arrived", ROBOT_ID);
+                }
             }
         }
 
