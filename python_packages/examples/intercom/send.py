@@ -1,6 +1,6 @@
-from dvbcdr.intercom import Intercom
+from dvbcdr.intercom import get_intercom_instance
 
-intercom = Intercom()
+intercom = get_intercom_instance()
 
 print("Sending to 'topic_1'...")
 intercom.publish("topic_1", "not printed first")

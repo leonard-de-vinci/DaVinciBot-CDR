@@ -1,4 +1,4 @@
-from dvbcdr.intercom import Intercom
+from dvbcdr.intercom import get_intercom_instance
 
 
 def recv_1(message_data):
@@ -13,7 +13,7 @@ def recv_2(message_data):
     print("received from 'topic_2' or 'topic_3' or 'test_topic':", message_data)
 
 
-intercom = Intercom()
+intercom = get_intercom_instance()
 intercom.subscribe("robot_position", recv_pos)
 intercom.subscribe(["topic_1", "topic_number"], recv_1)
 intercom.subscribe(["topic_2", "topic_3", "test_topic"], recv_2)

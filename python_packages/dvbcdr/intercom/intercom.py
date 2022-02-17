@@ -135,10 +135,14 @@ class Intercom:
         topic_codes: List[int] = []
 
         for topic in topics:
+            already_registered = topic in self.crc_cache
+
             topic_code, topic_ip = self.__get_topic_info(topic)
 
             topic_codes.append(topic_code)
-            self.com_socket.setsockopt(socket.IPPROTO_IP, socket.IP_ADD_MEMBERSHIP, struct.pack("4sl", socket.inet_aton(topic_ip), socket.INADDR_ANY))
+
+            if not already_registered:
+                self.com_socket.setsockopt(socket.IPPROTO_IP, socket.IP_ADD_MEMBERSHIP, struct.pack("4sl", socket.inet_aton(topic_ip), socket.INADDR_ANY))
 
         callback = Callback(topic_codes, action)
         self.callbacks.append(callback)
@@ -260,6 +264,27 @@ class Intercom:
             if process_limit > 0 and processed >= process_limit:
                 break
 
+    def unsubscribe(self, ref: int) -> None:
+        """
+        Unsubscribes a callback from the intercom.
+
+        If ref is negative, it will unsubscribe the event callback.
+        The reference of an event callback is automatically set to a negative number.
+
+        Args:
+            ref: The id of the callback to unsubscribe.
+        """
+        if ref > 0:
+            for callback in self.callbacks:
+                if callback.ref == ref:
+                    self.callbacks.remove(callback)
+                    break
+        else:
+            for callback in self.event_callbacks:
+                if callback.ref == -ref:
+                    self.event_callbacks.remove(callback)
+                    break
+
     def wait_here(self):
         """Blocks the current thread and run callbacks until the program closes."""
         self.run_callbacks()  # run waiting callbacks first
@@ -297,3 +322,17 @@ class Intercom:
     def publish_event(self, event_name: str) -> None:
         self.start()
         self.publish_raw(0, event_name)
+
+
+intercom_instance: Intercom = None
+
+
+def get_intercom_instance():
+    """
+    Returns the instance of intercom.
+    If no instance is created yet, it creates a new one.
+    """
+    global intercom_instance
+    if intercom_instance is None:
+        intercom_instance = Intercom()
+    return intercom_instance

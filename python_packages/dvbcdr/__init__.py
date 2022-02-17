@@ -10,5 +10,5 @@ intercom
     Communication between devices, processes using UDP multicast.
 """
 
-from . import intercom
+from .intercom import *
 from . import utils
