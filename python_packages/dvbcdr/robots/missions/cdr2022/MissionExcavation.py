@@ -1,9 +1,15 @@
 from ...robot import RobotSide
-from ...mission import Mission
-from .. import ActionMove, ActionMeasure, ActionServo
+from .. import Mission
+from ...actions import ActionMove, ActionMeasure, ActionServo
 
 
 class MissionExcavation(Mission):
+    resistor_tolerance = 50
+    valid_resistors = {
+        RobotSide.LEFT: 1000,
+        RobotSide.RIGHT: 470
+    }
+
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
 
@@ -73,15 +79,14 @@ class MissionExcavation(Mission):
     def __check_resistor(self, resistor: int):
         side = self.robot.side
 
-        if side == RobotSide.LEFT:
-            return 900 < resistor < 1100
-        elif side == RobotSide.RIGHT:
-            return 370 < resistor < 570
+        if side in self.valid_resistors:
+            valid = self.valid_resistors[side]
+            return valid - self.resistor_tolerance <= resistor <= valid + self.resistor_tolerance
         else:
             return False
 
     def get_name(self):
-        return "ExcavationSquares"
+        return "FlipExcavationSquares"
 
     def get_points(self):
         return 25

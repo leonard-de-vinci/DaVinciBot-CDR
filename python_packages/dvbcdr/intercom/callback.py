@@ -8,7 +8,7 @@ class Callback:
     action: Callable[[Any], None] = None
     topic_codes: List[int] = None
 
-    ref = random.getrandbits(32)
+    ref: int
 
     def __init__(self, topic_codes: List[int], action: Callable[[Any], None]):
         """
@@ -30,6 +30,7 @@ class Callback:
 
         self.topic_codes = topic_codes
         self.action = action
+        self.ref = random.getrandbits(31)
 
     def run(self, message_data):
         """

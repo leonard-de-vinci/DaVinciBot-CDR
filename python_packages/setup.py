@@ -4,5 +4,5 @@ setup(
     packages=find_packages(),
     name="dvbcdr",
     version="0.0.2",
-    install_requires=["numpy", "pyserial", "pyyaml", "pygame", "pyaccesspoint", "pysicktim", "pyusb", "sklearn"]
+    install_requires=["numpy", "pyserial", "pyyaml", "pygame", "pysicktim", "pyusb", "sklearn"]
 )

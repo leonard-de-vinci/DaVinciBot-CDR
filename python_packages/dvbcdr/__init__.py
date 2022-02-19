@@ -11,4 +11,5 @@ intercom
 """
 
 from .intercom import *
+from . import api
 from . import utils
