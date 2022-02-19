@@ -24,6 +24,7 @@ struct ReceivedMessage {
 
     void release() {
         free(ptr);
+        ptr = NULL;
     }
 };
 
@@ -63,6 +64,7 @@ class Intercom {
         static void registerSensor(String sensorId);
 
         static int isSensorRequested(String sensorId);
+        static bool isSensorRequested(String sensorId, int* readId);
         static void sendSensorValue(String sensorId, int readId, int value);
         static void sendSensorValue(String sensorId, int readId, float value);
 
@@ -79,7 +81,7 @@ class Intercom {
         static uint8_t _messageCounter;
         static ReceivedMessage _receivedMessages[MAX_RECEIVED_MESSAGES];
 
-        static bool internalReceive(uint8_t max);
+        static bool internalReceive();
 
         static void initEvents();
         static uint8_t _eventCounter;

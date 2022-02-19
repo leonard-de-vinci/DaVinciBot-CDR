@@ -14,7 +14,7 @@ uint8_t Intercom::_eventCounter = 0;
 String Intercom::_receivedEvents[MAX_RECEIVED_EVENTS];
 
 uint8_t Intercom::_servoCounter = 0;
-RegisteredServo _servos[MAX_REGISTERED_SERVO];
+RegisteredServo Intercom::_servos[MAX_REGISTERED_SERVO];
 
 void Intercom::init(String deviceId, unsigned long speed) {
     if(_initialized)
@@ -39,9 +39,10 @@ void Intercom::sendDeviceId() {
     Serial.print(F("{\"c\":0,\"v\":\""));
     Serial.print(Intercom::_deviceId);
     Serial.println(F("\"}"));
+    Serial.flush();
 }
 
-bool Intercom::internalReceive(uint8_t max = MAX_RECEIVED_MESSAGES) {
+bool Intercom::internalReceive() {
     deserializeJson(_lastJsonDocument, Serial.readStringUntil('\n'));
 
     _lastCommand = _lastJsonDocument["c"];
@@ -49,7 +50,7 @@ bool Intercom::internalReceive(uint8_t max = MAX_RECEIVED_MESSAGES) {
         sendDeviceId();
     } else if(_lastCommand == 2) {
         uint8_t type = _lastJsonDocument["t"].as<uint8_t>();
-        uint8_t topic = _lastJsonDocument["s"].as<uint32_t>(); // s for subject
+        uint32_t topic = _lastJsonDocument["s"].as<uint32_t>(); // s for subject
 
         int8_t length = -1;
         if(_lastJsonDocument.containsKey("l"))
@@ -57,7 +58,7 @@ bool Intercom::internalReceive(uint8_t max = MAX_RECEIVED_MESSAGES) {
 
         uint8_t pos = _messageCounter;
         for(uint8_t i = 0; i < MAX_RECEIVED_MESSAGES; i++) {
-            if(!_receivedMessages[i].occupied()) break;
+            if(!_receivedMessages[pos].occupied()) break;
             pos = (pos + 1) % MAX_RECEIVED_MESSAGES;
         }
 
@@ -133,7 +134,7 @@ void Intercom::tick() {
 
 void Intercom::waitForConnection() {
     while(true) {
-        internalReceive(1);
+        internalReceive();
         if(_lastCommand == 1 || _receivedMessages[_messageCounter].occupied())
             break;
     }
@@ -142,7 +143,7 @@ void Intercom::waitForConnection() {
 bool Intercom::waitForPing(unsigned int timeoutMs) {
     unsigned long start = millis();
     while(true) {
-        internalReceive(1);
+        internalReceive();
         if(_lastCommand == 1)
             return true;
         if(millis() - start > timeoutMs)
@@ -155,6 +156,7 @@ void Intercom::subscribe(String topic) {
         Serial.print(F("{\"c\":2,\"t\":255,\"s\":"));
         Serial.print(crc24(topic));
         Serial.println(F("}"));
+        Serial.flush();
 
         if(waitForPing(250))
             break;
@@ -167,6 +169,7 @@ void Intercom::publish(String topic, int value) {
     Serial.print(F(",\"v\":"));
     Serial.print(value);
     Serial.println(F("}"));
+    Serial.flush();
 }
 
 void Intercom::publish(String topic, String value) {
@@ -175,6 +178,7 @@ void Intercom::publish(String topic, String value) {
     Serial.print(F(",\"v\":\""));
     Serial.print(value);
     Serial.println(F("\"}"));
+    Serial.flush();
 }
 
 void Intercom::publish(String topic, float value) {
@@ -183,6 +187,7 @@ void Intercom::publish(String topic, float value) {
     Serial.print(F(",\"v\":"));
     Serial.print(value);
     Serial.println(F("}"));
+    Serial.flush();
 }
 
 void Intercom::publish(String topic, int* ptr, int length) {
@@ -198,6 +203,7 @@ void Intercom::publish(String topic, int* ptr, int length) {
         Serial.print(ptr[i]);
     }
     Serial.println(F("]}"));
+    Serial.flush();
 }
 
 void Intercom::publish(String topic, String* ptr, int length) {
@@ -215,6 +221,7 @@ void Intercom::publish(String topic, String* ptr, int length) {
         Serial.print(F("\""));
     }
     Serial.println(F("]}"));
+    Serial.flush();
 }
 
 void Intercom::publish(String topic, float* ptr, int length) {
@@ -230,6 +237,7 @@ void Intercom::publish(String topic, float* ptr, int length) {
         Serial.print(ptr[i]);
     }
     Serial.println(F("]}"));
+    Serial.flush();
 }
 
 bool Intercom::instantReceiveInt(String topic, int* value) {
@@ -237,11 +245,11 @@ bool Intercom::instantReceiveInt(String topic, int* value) {
 
     for(uint8_t i = 0; i < MAX_RECEIVED_MESSAGES; i++) {
         uint8_t pos = (_messageCounter + i) % MAX_RECEIVED_MESSAGES;
-        ReceivedMessage message = _receivedMessages[pos];
+        ReceivedMessage *message = &_receivedMessages[pos];
 
-        if(message.occupied() && message.topic == crc) {
-            *value = *(int*)message.ptr;
-            message.release();
+        if(message->occupied() && message->topic == crc) {
+            *value = *(int*)message->ptr;
+            message->release();
             return true;
         }
     }
@@ -254,11 +262,11 @@ bool Intercom::instantReceiveString(String topic, String* value) {
 
     for(uint8_t i = 0; i < MAX_RECEIVED_MESSAGES; i++) {
         uint8_t pos = (_messageCounter + i) % MAX_RECEIVED_MESSAGES;
-        ReceivedMessage message = _receivedMessages[pos];
+        ReceivedMessage *message = &_receivedMessages[pos];
 
-        if(message.occupied() && message.topic == crc) {
-            *value = *(String*)message.ptr;
-            message.release();
+        if(message->occupied() && message->topic == crc) {
+            *value = *(String*)message->ptr;
+            message->release();
             return true;
         }
     }
@@ -271,11 +279,11 @@ bool Intercom::instantReceiveFloat(String topic, float* value) {
 
     for(uint8_t i = 0; i < MAX_RECEIVED_MESSAGES; i++) {
         uint8_t pos = (_messageCounter + i) % MAX_RECEIVED_MESSAGES;
-        ReceivedMessage message = _receivedMessages[pos];
+        ReceivedMessage *message = &_receivedMessages[pos];
 
-        if(message.occupied() && message.topic == crc) {
-            *value = *(float*)message.ptr;
-            message.release();
+        if(message->occupied() && message->topic == crc) {
+            *value = *(float*)message->ptr;
+            message->release();
             return true;
         }
     }
@@ -288,12 +296,12 @@ bool Intercom::instantReceiveIntArray(String topic, int* ptr, int* length) {
 
     for(uint8_t i = 0; i < MAX_RECEIVED_MESSAGES; i++) {
         uint8_t pos = (_messageCounter + i) % MAX_RECEIVED_MESSAGES;
-        ReceivedMessage message = _receivedMessages[pos];
+        ReceivedMessage *message = &_receivedMessages[pos];
 
-        if(message.occupied() && message.topic == crc) {
-            *length = message.length;
-            memcpy(ptr, message.ptr, message.length * sizeof(int));
-            message.release();
+        if(message->occupied() && message->topic == crc) {
+            *length = message->length;
+            memcpy(ptr, message->ptr, message->length * sizeof(int));
+            message->release();
             return true;
         }
     }
@@ -306,12 +314,12 @@ bool Intercom::instantReceiveStringArray(String topic, String* ptr, int* length)
 
     for(uint8_t i = 0; i < MAX_RECEIVED_MESSAGES; i++) {
         uint8_t pos = (_messageCounter + i) % MAX_RECEIVED_MESSAGES;
-        ReceivedMessage message = _receivedMessages[pos];
+        ReceivedMessage *message = &_receivedMessages[pos];
 
-        if(message.occupied() && message.topic == crc) {
-            *length = message.length;
-            memcpy(ptr, message.ptr, message.length * sizeof(String));
-            message.release();
+        if(message->occupied() && message->topic == crc) {
+            *length = message->length;
+            memcpy(ptr, message->ptr, message->length * sizeof(String));
+            message->release();
             return true;
         }
     }
@@ -324,12 +332,12 @@ bool Intercom::instantReceiveFloatArray(String topic, float* ptr, int* length) {
 
     for(uint8_t i = 0; i < MAX_RECEIVED_MESSAGES; i++) {
         uint8_t pos = (_messageCounter + i) % MAX_RECEIVED_MESSAGES;
-        ReceivedMessage message = _receivedMessages[pos];
+        ReceivedMessage *message = &_receivedMessages[pos];
 
-        if(message.occupied() && message.topic == crc) {
-            *length = message.length;
-            memcpy(ptr, message.ptr, message.length * sizeof(float));
-            message.release();
+        if(message->occupied() && message->topic == crc) {
+            *length = message->length;
+            memcpy(ptr, message->ptr, message->length * sizeof(float));
+            message->release();
             return true;
         }
     }
@@ -360,6 +368,7 @@ void Intercom::publishEvent(String eventName) {
     Serial.print(F("{\"c\":3,\"e\":\""));
     Serial.print(eventName);
     Serial.println(F("\"}"));
+    Serial.flush();
 }
 
 void Intercom::registerServo(String servoId, int pin) {
@@ -381,6 +390,10 @@ int Intercom::isSensorRequested(String sensorId) {
     instantReceiveInt("api_request_sensor" + sensorId, &readId);
     
     return readId;
+}
+
+bool Intercom::isSensorRequested(String sensorId, int* readId) {
+    return instantReceiveInt("api_request_sensor" + sensorId, readId);
 }
 
 void Intercom::sendSensorValue(String sensorId, int readId, int value) {

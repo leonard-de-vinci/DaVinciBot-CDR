@@ -85,7 +85,7 @@ void logic() {
 }
 
 void setup() {
-    Intercom::init("robot_position_read", DEFAULT_INTERCOM_SPEED);
+    Intercom::init("brain_" + robot_name, DEFAULT_INTERCOM_SPEED);
 
     Intercom::subscribe("force_robot_position");
     Intercom::subscribe("move_robot");
@@ -161,6 +161,8 @@ double anglePi(double angle) {
 }
 
 void loop() {
+    Intercom::tick();
+
     if(Intercom::instantHasReceivedEvent("stop")) {
         arrived_sent = true;
         motorController->stop();

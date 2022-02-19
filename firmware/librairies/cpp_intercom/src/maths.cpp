@@ -8,7 +8,7 @@ uint32_t CRC_MASK = ((MSB_MASK - 1) << 1) | 1;
 
 uint32_t crc24(String inputs) {
     uint32_t crc = CRC_INIT;
-    for (int i = 0; i < inputs.length(); i++) {
+    for (unsigned int i = 0; i < inputs.length(); i++) {
         crc ^= (uint32_t)inputs[i] << 16;
         for (int j = 0; j < 8; j++) {
             crc <<= 1;
