@@ -1,5 +1,6 @@
 #include "intercom.h"
 #include "constants.h"
+#include "robot.h"
 #include "controllers/BasicMotorController.h"
 
 #include <Arduino.h>
@@ -131,6 +132,8 @@ void setup() {
 
     timer.begin(logic, 10*1000); // in microseconds, so 10ms
     time = 0;
+
+    robot_setup();
 }
 
 const float constDist = PI * wheel_diameter / wheel_ticks_count;
@@ -248,5 +251,9 @@ void loop() {
 
         posTicksRight = 0;
         posTicksLeft = 0;
+
+        robot_logic();
     }
+
+    robot_loop();
 }
