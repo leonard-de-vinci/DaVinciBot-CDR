@@ -24,21 +24,23 @@ It can also contains utilities or debugging programs, like `core/visualizer` tha
 
 ## `firmware`
 
-This directory contains C/C++ programs that are compiled and sent to the *Teensy* boards. Each board has a specific folder containing its firmware as a *PlatformIO* project that can easily be opened with Visual Studio Code for example.
+This directory contains C/C++ programs that are compiled and sent to the *Teensy* or *Arduino* boards. Each folder contains a *PlatformIO* project that can easily be opened with Visual Studio Code for example.
 
-It also contains the `firmware/librairies` folder that contains the libraries used by multiple boards.
+It also contains the `firmware/librairies` folder that contains the libraries used by multiple boards or projects.
 
 ## `python_packages`
 
 The `python_packages` directory contains the Python librairies used for this project, including *intercom* (see *Architecture below*) or maths and pygame utils.
 
+During the competition, robots will try to score points by executing *actions*: this is the smallest thing a robot can do. These actions are grouped together in *missions* also defined in this directory.
+
 # Hardware
 
 Each robot contains:
-- 2 motors ([Gotronic 37Y3530-131](https://www.gotronic.fr/art-motoreducteur-encodeur-37y3530-131-20604.htm) or [Polulu 4867](https://www.pololu.com/product/4867))
+- 2 motors ([Worm Gearmotor, Ratio 100:1, with encoder](https://www.motionco.co.uk/worm-gearmotor-ratio-100-1-encoder.html)
 - [1 Raspberry Pi 4 Model B](https://www.raspberrypi.org/products/raspberry-pi-4-model-b/)
-- [2 Teensy 4.1 boards](https://www.pjrc.com/store/teensy41.html)
-- ...and more coming soon
+- [1 Teensy 4.1 boards](https://www.pjrc.com/store/teensy41.html)
+- ...specific components like servos.
 
 # Architecture
 
